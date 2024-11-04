@@ -1,0 +1,7 @@
+__pycache__
+env
+
+ui/dist
+ui/node_modules
+
+.env
