@@ -16,19 +16,9 @@ export function isError(t: unknown): t is APIError {
   return !!(t as APIError | undefined | null)?.error;
 }
 
-export enum ScanState {
-  IDLE = 0,
-  SUBSONIC = 1,
-  METADATA = 2,
-  TAGS = 3,
-  DONE = 4
-}
-
 export interface ScanStatus {
-  subsonic: [number];
-  metadata: [number, number];
-  tags: [number, number];
-  state: ScanState;
+  fetched: number;
+  scanning: boolean;
 }
 
 export interface Tag {
@@ -90,3 +80,5 @@ export interface Playlist {
   name: string;
   recordings: Recording[];
 }
+
+export type PlaylistResponse = [Playlist, string];

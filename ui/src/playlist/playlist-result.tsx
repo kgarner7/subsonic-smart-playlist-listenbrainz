@@ -12,7 +12,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Col, Form, Input, Row, Table, TableColumnsType } from "antd";
+import {
+  Button,
+  Col,
+  Collapse,
+  Form,
+  Input,
+  Row,
+  Table,
+  TableColumnsType,
+} from "antd";
+import { strip } from "ansicolor";
 import {
   HTMLAttributes,
   useCallback,
@@ -67,11 +77,12 @@ interface PlaylistWithId extends Playlist {
 
 export interface PlaylistDataProps {
   playlist: Playlist;
+  log: string;
 }
 
 type FormData = Omit<PlaylistWithId, "recordings">;
 
-export const PlaylistData = ({ playlist }: PlaylistDataProps) => {
+export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
   const { showText, makeRequest } = useAppContext();
   const notify = useNotifyContext();
   const [form] = useForm<FormData>();
@@ -124,6 +135,10 @@ export const PlaylistData = ({ playlist }: PlaylistDataProps) => {
       };
     });
   }, []);
+
+  const logBody = useMemo(() => {
+    return strip(log);
+  }, [log]);
 
   const COLUMNS = useMemo(() => {
     const base: TableColumnsType<Recording> = [
@@ -212,6 +227,13 @@ export const PlaylistData = ({ playlist }: PlaylistDataProps) => {
 
   return (
     <Form form={form} onFinish={submit}>
+      <Item>
+        <Collapse
+          items={[
+            { key: "data", label: "Logs", children: <pre>{logBody}</pre> },
+          ]}
+        />
+      </Item>
       <Item
         label="Playlist name"
         name="name"

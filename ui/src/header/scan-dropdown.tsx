@@ -2,7 +2,7 @@ import { SearchOutlined } from "@ant-design/icons";
 import { Dropdown, Button, MenuProps, theme } from "antd";
 import { useMemo, useCallback } from "react";
 import { useAppContext, useNotifyContext, useScanContext } from "../contexts";
-import { ScanState, StartScan } from "../types";
+import { StartScan } from "../types";
 import { isScanning, SCAN_INTERVAL_MS } from "../util";
 
 const { useToken } = theme;
@@ -34,38 +34,13 @@ export const ScanDropdown = () => {
     ];
 
     if (isScanning(scanStatus)) {
-      let key: string;
-      let label: string;
-
-      switch (scanStatus!.state) {
-        case ScanState.SUBSONIC: {
-          label = `Songs fetched: ${scanStatus!.subsonic}`;
-          key = "Subsonic tracks";
-          break;
-        }
-        case ScanState.METADATA:
-          label = `ListenBrainz metadata lookup: ${scanStatus!.metadata[0]} / ${
-            scanStatus!.metadata[1]
-          }`;
-          key = "Metadata";
-          break;
-        default:
-          label = `ListenBrainz popularity/tag lookup: ${
-            scanStatus!.tags[0]
-          } / ${scanStatus!.tags[1]}`;
-          key = "tags/popularity";
-          break;
-      }
-
-      base.push({ type: "divider" });
       base.push({
         disabled: true,
-        label: <span style={{ color: token.colorText }}>{label}</span>,
-        key,
-      });
-      base.push({
-        disabled: true,
-        label: <span style={{ color: token.colorText }}>Fetching {key}</span>,
+        label: (
+          <span style={{ color: token.colorText }}>
+            Fetching {scanStatus!.fetched}
+          </span>
+        ),
         key: "state",
       });
     }
@@ -78,10 +53,8 @@ export const ScanDropdown = () => {
       const scanStart = await makeRequest<StartScan>("scan", "POST", { full });
       if (scanStart) {
         setScanStatus({
-          metadata: [0, 0],
-          state: ScanState.SUBSONIC,
-          subsonic: [0],
-          tags: [0, 0],
+          fetched: 0,
+          scanning: true,
         });
 
         if (scanRef.current) {
@@ -114,7 +87,7 @@ export const ScanDropdown = () => {
   return (
     <Dropdown
       menu={{ items: scanItems, onClick: clickMenu }}
-      trigger={["click", "hover"]}
+      trigger={isScanning(scanStatus) ? ["hover"] : ["click"]}
     >
       <Button
         icon={<SearchOutlined />}

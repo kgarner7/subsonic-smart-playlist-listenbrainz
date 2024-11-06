@@ -12,7 +12,7 @@ import {
 import { DefaultOptionType } from "antd/es/select";
 import { useCallback, useState } from "react";
 import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
-import { Playlist, SortDirection, SortType } from "../types";
+import { PlaylistResponse, SortDirection, SortType } from "../types";
 import { FormItem, FormRowData } from "./form-item";
 import { getBool, setBool } from "../util";
 import { FormItemType } from "./types";
@@ -61,7 +61,7 @@ interface FormData {
 }
 
 export interface PlaylistFormProps {
-  onSuccess: (playlist: Playlist) => void;
+  onSuccess: (playlist: PlaylistResponse) => void;
 }
 
 const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
@@ -104,7 +104,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
 
       try {
         setLoading(true);
-        const response = await makeRequest<Playlist>("radio", "POST", {
+        const response = await makeRequest<PlaylistResponse>("radio", "POST", {
           mode,
           prompt,
         });
@@ -112,7 +112,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         if (response !== null) {
           notify.success({
             message: "Playlist successfully generated",
-            description: response.name,
+            description: response[0].name,
             placement: "top",
           });
           onSuccess(response);

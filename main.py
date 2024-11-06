@@ -1,16 +1,18 @@
 from dotenv import load_dotenv
-from functools import wraps
 
 load_dotenv()
 
+from functools import wraps
+from json import dumps, loads
 from os import environ
+from subprocess import run
 
 from flask import Flask, Response, render_template, request, session
 from flask_session import Session
 
 from subsonic.custom_connection import CustomConnection
-from subsonic.database import get_metadata, get_radio
-from subsonic.process import MetadataProcess, ScanState
+from subsonic.database import ArtistSubsonicDatabase, get_metadata
+from subsonic.process import MetadataHandler
 
 CACHE_TYPE = environ.get("CACHE_TYPE", "filesystem")
 PERMANENT_SESSION_LIFETIME = int(environ.get("SESSION_DURATION_SEC", 86400))
@@ -107,30 +109,15 @@ def login():
 @app.post("/api/scan")
 @login_or_credentials_required
 def start_scan(_credentials):
-    with metadata_process.state.get_lock():
-        if (
-            metadata_process.state[4] == ScanState.DONE.value
-            or metadata_process.state[4] == ScanState.IDLE.value
-        ):
-            is_full = request.json.get("full", False)
-            metadata_process.request_event.put(is_full)
-
-            return {"started": True}
-
-        return {"started": False}
+    is_full = request.json.get("full", False)
+    started = handler.submit_scan(is_full)
+    return {"started": started}
 
 
 @app.get("/api/scanStatus")
 @login_or_credentials_required
 def get_scan_status(_credentials):
-    state = metadata_process.state
-    with state.get_lock():
-        return {
-            "subsonic": (state[0],),
-            "metadata": (state[1], state[2]),
-            "tags": (state[3], state[2]),
-            "state": state[4],
-        }
+    return handler.get_state_json()
 
 
 @app.get("/api/tags")
@@ -153,11 +140,19 @@ def radio(credentials):
     if not prompt:
         return {"error": "Must provide a prompt"}, 400
 
-    recordings = get_radio(mode, prompt, credentials)
-    if not recordings:
-        return {"error": "could not find recordings to make a playlist"}, 400
+    output = run(
+        ["python3", "get_radio.py"],
+        capture_output=True,
+        input=dumps({"mode": mode, "prompt": prompt, "credentials": credentials}),
+        text=True,
+    )
 
-    return recordings, 200
+    if output.returncode != 0:
+        return {"error": "could not find recordings to make a playlist"}, 400
+    else:
+        data = loads(output.stdout.split("\n")[-1])
+
+        return [data, output.stderr]
 
 
 @app.get("/api/proxy/<id>")
@@ -202,6 +197,7 @@ def add_headers(response):
         "form-action 'self';"
         "frame-ancestors 'self';"
         "frame-src 'none';"
+        "img-src *;"
         "script-src 'self' 'unsafe-inline';"
         "style-src 'self' 'unsafe-inline';"
         "object-src 'none'"
@@ -211,8 +207,12 @@ def add_headers(response):
 
 
 if __name__ == "__main__":
-    metadata_process = MetadataProcess()
-    metadata_process.start()
+    handler = MetadataHandler()
+
+    database = ArtistSubsonicDatabase()
+    database.create()
+
+    del database
 
     if DEBUG:
         app.run()
@@ -238,5 +238,7 @@ if __name__ == "__main__":
                 return self.application
 
         bind_address = environ.get("ADDRESS", "0.0.0.0:5000")
-        workers = environ.get("WORKERS", 4)
-        StandaloneApplication(app, {"bind": bind_address, "workers": workers}).run()
+        workers = environ.get("WORKERS", 2)
+        standalone = StandaloneApplication(
+            app, {"bind": bind_address, "workers": workers, "preload_app": True}
+        ).run()

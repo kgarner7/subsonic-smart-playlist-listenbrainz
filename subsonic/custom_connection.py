@@ -31,6 +31,8 @@ class CustomConnection(Connection):
             self._credentials = credentials
         elif username != None and password != None:
             if LEGACY_AUTH:
+                # Yes, you are basically just storing the password.
+                # Nothing you can do about that
                 self._credentials = {
                     "u": username,
                     "p": "enc:%s" % self._hexEnc(password),

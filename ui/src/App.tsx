@@ -14,14 +14,13 @@ import { NotifyContext } from "./contexts/notify-context";
 import {
   APIResponse,
   isError,
-  ScanState,
   ScanStatus,
   SortDirection,
   SortInfo,
   SortType,
   Tags,
 } from "./types";
-import { sortFunc, SCAN_INTERVAL_MS, getBool } from "./util";
+import { sortFunc, SCAN_INTERVAL_MS, getBool, isScanning } from "./util";
 import { TagContext } from "./contexts/tag-context";
 import { AppHeader } from "./header/app-header";
 
@@ -29,16 +28,6 @@ const LoginForm = lazy(() => import("./login"));
 const Playlist = lazy(() => import("./playlist"));
 
 const { Content } = Layout;
-
-const SCAN_MODES = [ScanState.METADATA, ScanState.SUBSONIC, ScanState.TAGS];
-
-const isScanning = (status: ScanStatus | null) => {
-  if (status) {
-    return SCAN_MODES.includes(status.state);
-  }
-
-  return false;
-};
 
 const getDarkPreferred = () => {
   const dark = getBool("dark");

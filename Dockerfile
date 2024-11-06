@@ -11,9 +11,9 @@ FROM python:3.12-slim AS main
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-deps --no-cache-dir -r requirements.txt
 
-COPY main.py .
+COPY database_sync.py get_radio.py main.py .
 COPY subsonic subsonic
 COPY --from=builder /ui/dist/ ui/dist
 

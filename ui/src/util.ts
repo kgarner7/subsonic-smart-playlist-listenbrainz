@@ -1,11 +1,9 @@
-import { ScanState, ScanStatus, SortDirection, SortInfo, SortType, Tag } from "./types";
+import { ScanStatus, SortDirection, SortInfo, SortType, Tag } from "./types";
 
-
-const SCAN_MODES = [ScanState.METADATA, ScanState.SUBSONIC, ScanState.TAGS];
 
 export const isScanning = (status: ScanStatus | null) => {
   if (status) {
-    return SCAN_MODES.includes(status.state);
+    return status.scanning;
   }
 
   return false;

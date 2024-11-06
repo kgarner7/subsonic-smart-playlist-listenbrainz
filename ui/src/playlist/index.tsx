@@ -1,14 +1,14 @@
 import { Col, Tabs } from "antd";
 import PlaylistForm from "./playlist-form";
 import { useCallback, useState } from "react";
-import { Playlist as PlaylistType } from "../types";
+import { PlaylistResponse } from "../types";
 import { PlaylistData } from "./playlist-result";
 
 const Playlist = () => {
-  const [data, setData] = useState<PlaylistType | null>(null);
+  const [data, setData] = useState<PlaylistResponse | null>(null);
   const [key, setKey] = useState("1");
 
-  const onSuccess = useCallback((data: PlaylistType) => {
+  const onSuccess = useCallback((data: PlaylistResponse) => {
     setData(data);
     setKey("2");
   }, []);
@@ -28,7 +28,7 @@ const Playlist = () => {
             key: "2",
             label: "Generated playlist",
             disabled: !data,
-            children: data && <PlaylistData playlist={data} />,
+            children: data && <PlaylistData log={data[1]} playlist={data[0]} />,
           },
         ]}
         onChange={setKey}

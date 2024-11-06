@@ -61,6 +61,7 @@ class MultivaluedLocalRecordingSearchByArtistService(
 
         artist_mbids = [artist["artist_mbid"] for artist in similar_artists]
         artist_mbids.append(artist_mbid)
+        print(artist_mbids)
         placeholders = ",".join(("?",) * len(artist_mbids))
         cursor = db.execute_sql(query % placeholders, params=artist_mbids)
 

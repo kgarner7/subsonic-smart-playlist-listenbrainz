@@ -1,50 +1,53 @@
 from multiprocessing.sharedctypes import SynchronizedArray
-from multiprocessing import Array, Queue, Process
-from queue import Empty
 
-from .database import ProcessLocalSubsonicDatabase, ScanState
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Array
+from subprocess import PIPE, Popen
 
 
-class MetadataProcess(Process):
+class MetadataHandler:
+    __slots__ = "executor", "scanStatus"
+
     def __init__(self) -> None:
-        self.request_event: "Queue" = Queue(maxsize=1)
-        self.state: "SynchronizedArray[int]" = Array(
-            "L", [0, 0, 0, 0, ScanState.IDLE.value]
-        )
-        """
-        Process-safe progress tracker. Has the following meanings:
-        - [0]: Fetched subsonic tracks
-        - [1]: Metadata lookup progress
-        - [2]: Metadata lookup total
-        - [3]: Popularity lookup progress. Note that this count (if specified) is also metadata lookup count
-        - [4]: Mode
-        """
+        self.executor = ThreadPoolExecutor(1)
+        self.scanStatus: SynchronizedArray[int] = Array("L", [0, 0])
 
-        super().__init__(daemon=True)
+        super().__init__()
 
-    def run(self) -> None:
-        subsonic_db = ProcessLocalSubsonicDatabase(self.state)
-        subsonic_db.open()
-        subsonic_db.create()
+    def get_state_json(self) -> dict:
+        with self.scanStatus.get_lock():
+            return {"fetched": self.scanStatus[0], "scanning": bool(self.scanStatus[1])}
+
+    def submit_scan(self, full: bool) -> bool:
+        with self.scanStatus.get_lock():
+            if self.scanStatus[1]:
+                return False
+
+            self.executor.submit(self.scan, full)
+            self.scanStatus[0] = 0
+            self.scanStatus[1] = 1
+
+            return True
+
+    def scan(self, is_full: bool) -> None:
+        args = ["python3", "database_sync.py"]
+        if is_full:
+            args.append("--full")
+
+        process = Popen(args, stdout=PIPE, stderr=PIPE)
+
+        self.scanStatus[0] = 0
+        self.scanStatus[1] = 1
 
         while True:
-            is_full = self.request_event.get(True)
-            with self.state.get_lock():
-                self.state[4] = ScanState.SUBSONIC.value
+            line = process.stdout.readline()
 
-                # In the extremely rare chance that we get a value from the queue
-                # switch processes, and another process then immediately requests the queue again
-                # we make sure to empty it. Since it is of max size one, this
-                # operation is acceptable. Ignore the exception
-                # This allows us to use self.state.get_lock()
-                try:
-                    self.request_event.get(False)
-                except Empty:
-                    pass
-            try:
-                subsonic_db.run_sync(is_full)
-            except BaseException as e:
-                with self.state.get_lock():
-                    self.state[4] = ScanState.DONE.value
-                print("Scan failed to complete", e)
-                raise e
+            if not line:
+                break
+
+            self.scanStatus[0] = int(line)
+
+        errors = process.stderr.readlines()
+
+        print(errors)
+        self.scanStatus[1] = False
