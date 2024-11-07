@@ -9,7 +9,7 @@ export const isScanning = (status: ScanStatus | null) => {
   return false;
 };
 
-export const SCAN_INTERVAL_MS = 5000;
+export const SCAN_INTERVAL_MS = 2000;
 
 export const getBool = (key: string): boolean | null => {
   const value = localStorage.getItem(key);

@@ -65,3 +65,8 @@ h1 {
   cursor: move;
   max-width: calc(33vw);
 }
+
+.logs {
+  overflow: scroll;
+  max-height: 300px;
+}

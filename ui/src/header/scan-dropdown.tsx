@@ -84,17 +84,19 @@ export const ScanDropdown = () => {
     [startScan]
   );
 
+  const scanning = isScanning(scanStatus);
+
   return (
     <Dropdown
       menu={{ items: scanItems, onClick: clickMenu }}
-      trigger={isScanning(scanStatus) ? ["hover"] : ["click"]}
+      trigger={["click"]}
     >
-      <Button
-        icon={<SearchOutlined />}
-        loading={isScanning(scanStatus)}
-        type="primary"
-      >
-        {showText && "Scan library"}
+      <Button icon={<SearchOutlined />} loading={scanning} type="primary">
+        {scanning
+          ? `Scanning. Fetched ${scanStatus!.fetched} so far`
+          : showText
+          ? "Scan library"
+          : null}
       </Button>
     </Dropdown>
   );

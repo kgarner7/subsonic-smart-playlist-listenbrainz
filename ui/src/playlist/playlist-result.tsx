@@ -209,7 +209,6 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
             placement: "top",
           });
 
-          console.log(resp.id);
           form.setFieldValue("id", resp.id);
         }
       } catch (error) {
@@ -230,7 +229,11 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
       <Item>
         <Collapse
           items={[
-            { key: "data", label: "Logs", children: <pre>{logBody}</pre> },
+            {
+              key: "data",
+              label: "Logs",
+              children: <pre className="logs">{logBody}</pre>,
+            },
           ]}
         />
       </Item>

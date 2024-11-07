@@ -148,6 +148,7 @@ def radio(credentials):
     )
 
     if output.returncode != 0:
+        print(output.stderr)
         return {"error": "could not find recordings to make a playlist"}, 400
     else:
         data = loads(output.stdout.split("\n")[-1])
@@ -206,39 +207,11 @@ def add_headers(response):
     return response
 
 
+handler = MetadataHandler()
+
+database = ArtistSubsonicDatabase()
+database.create()
+del database
+
 if __name__ == "__main__":
-    handler = MetadataHandler()
-
-    database = ArtistSubsonicDatabase()
-    database.create()
-
-    del database
-
-    if DEBUG:
-        app.run()
-    else:
-        from gunicorn.app.base import BaseApplication
-
-        class StandaloneApplication(BaseApplication):
-            def __init__(self, app, options=None):
-                self.options = options or {}
-                self.application = app
-                super().__init__()
-
-            def load_config(self):
-                config = {
-                    key: value
-                    for key, value in self.options.items()
-                    if key in self.cfg.settings and value is not None
-                }
-                for key, value in config.items():
-                    self.cfg.set(key.lower(), value)
-
-            def load(self):
-                return self.application
-
-        bind_address = environ.get("ADDRESS", "0.0.0.0:5000")
-        workers = environ.get("WORKERS", 2)
-        standalone = StandaloneApplication(
-            app, {"bind": bind_address, "workers": workers, "preload_app": True}
-        ).run()
+    app.run()

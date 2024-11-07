@@ -116,8 +116,6 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
             placement: "top",
           });
           onSuccess(response);
-        } else {
-          notify.error({ message: "Failed to generate playlist" });
         }
       } catch (error) {
         notify.error({

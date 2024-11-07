@@ -1,7 +1,11 @@
 services:
   troi-subsonic-generator:
     image: troi-subsonic-generator
-    env_file: .env
+    env_file: example.env
     container_name: troi-subsonic-generator
+    # We need a volume to save the Sqlite3 database and sessions
+    # if using filesystem
+    volumes:
+      - $HOST_PATH:/app/data
     ports:
       - "5000:5000"

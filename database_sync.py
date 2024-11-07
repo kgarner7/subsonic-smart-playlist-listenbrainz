@@ -102,19 +102,21 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
             song_count = len(songs)
             offset += song_count
 
-            if len(songs_to_resolve) >= self.BATCH_SIZE:
+            if len(songs_to_resolve) >= self.LOOKUP_BATCH_SIZE:
                 # When we have enough songs (1000), we do the following:
                 self.lookup_and_resolve_songs_metadata(
-                    songs_to_resolve[: self.BATCH_SIZE]
+                    songs_to_resolve[: self.LOOKUP_BATCH_SIZE]
                 )
 
-                songs_to_resolve = songs_to_resolve[self.BATCH_SIZE :]
+                songs_to_resolve = songs_to_resolve[self.LOOKUP_BATCH_SIZE :]
 
             print(offset, flush=True)
 
         while songs_to_resolve:
-            self.lookup_and_resolve_songs_metadata(songs_to_resolve[: self.BATCH_SIZE])
-            songs_to_resolve = songs_to_resolve[self.BATCH_SIZE :]
+            self.lookup_and_resolve_songs_metadata(
+                songs_to_resolve[: self.LOOKUP_BATCH_SIZE]
+            )
+            songs_to_resolve = songs_to_resolve[self.LOOKUP_BATCH_SIZE :]
 
         self.cleanup()
 

@@ -14,7 +14,7 @@ const Playlist = () => {
   }, []);
 
   return (
-    <Col span={20}>
+    <Col xs={20}>
       <Tabs
         activeKey={key}
         centered
