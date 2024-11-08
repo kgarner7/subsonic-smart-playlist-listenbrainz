@@ -29,7 +29,8 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         self.recording_lookup = FixedLookup()
 
         # Store existing ids
-        self.existing_artist_mbids: Set[str] = set()
+        self.existing_artists: Set[str] = set()
+        self.existing_artist_mbids_to_subsonic: Dict[str, str | None] = dict()
         self.existing_mbid_subsonic_id_to_id: Dict[Tuple[str, str], int] = {}
         self.existing_subsonic_id_to_mbid: Dict[str, str] = {}
         self.seen_existing_ids: Set[str] = set()
@@ -66,6 +67,34 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
             return
 
         self.fetch_existing_data()
+
+        artists_index = conn.getArtists()["artists"]["index"]
+
+        # OS Servers are required to have it (empty) if they support it
+        if "musicBrainzId" in artists_index[0]["artist"][0]:
+            artist_updates: List[DBArtist] = []
+
+            for index in artists_index:
+                for artist in index["artist"]:
+                    mbid = artist.get("musicBrainzId")
+
+                    if mbid:
+                        if mbid in self.existing_artist_mbids_to_subsonic:
+                            existing = self.existing_artist_mbids_to_subsonic[mbid]
+                            if existing != artist["name"]:
+                                artist_updates.append(
+                                    DBArtist(mbid=mbid, subsonic_name=artist["name"])
+                                )
+                        else:
+                            self.existing_artist_mbids_to_subsonic[mbid] = artist[
+                                "name"
+                            ]
+
+            if artist_updates:
+                with db.atomic():
+                    DBArtist.bulk_update(
+                        artist_updates, fields=[DBArtist.subsonic_name], batch_size=50
+                    )
 
         songs_to_resolve: List[dict] = []
         offset = 0
@@ -135,8 +164,9 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                 (recording.file_id, recording.recording_mbid)
             ] = recording.id
 
-        for artist in DBArtist.select(DBArtist.mbid):
-            self.existing_artist_mbids.add(artist.mbid)
+        for artist in DBArtist.select(DBArtist.mbid, DBArtist.subsonic_name):
+            self.existing_artists.add(artist.mbid)
+            self.existing_artist_mbids_to_subsonic[artist.mbid] = artist.subsonic_name
 
     def lookup_and_resolve_songs_metadata(self, songs: List[dict]) -> None:
         # 1. Bulk lookup the metadata from ListenBrainz
@@ -205,11 +235,15 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                         artist_name = credits.name
 
                         for artist in artists:
-                            if artist.mbid not in self.existing_artist_mbids:
-                                self.existing_artist_mbids.add(artist.mbid)
+                            if artist.mbid not in self.existing_artists:
+                                self.existing_artists.add(artist.mbid)
 
                                 DBArtist.insert(
-                                    mbid=artist.mbid, name=artist.name
+                                    mbid=artist.mbid,
+                                    name=artist.name,
+                                    subsonic_name=self.existing_artist_mbids_to_subsonic.get(
+                                        artist.mbid
+                                    ),
                                 ).execute()
                     else:
                         # If there is no artist credit resolved, use the

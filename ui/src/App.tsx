@@ -179,7 +179,10 @@ const App = () => {
       const func = sortFunc(artistSort);
 
       return artistTags.artists.sort(func).map((item) => ({
-        label: item.name,
+        label:
+          item.subsonic_name && item.subsonic_name !== item.name
+            ? `${item.subsonic_name} ⋅ ${item.name}`
+            : item.name,
         value: item.mbid,
       }));
     }

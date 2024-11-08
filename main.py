@@ -153,6 +153,10 @@ def radio(credentials):
     else:
         data = loads(output.stdout.split("\n")[-1])
 
+        if not data:
+            print(output.stderr)
+            return {"error": "could not find recordings to make a playlist"}, 400
+
         return [data, output.stderr]
 
 
