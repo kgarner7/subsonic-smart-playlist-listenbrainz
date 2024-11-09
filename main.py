@@ -218,4 +218,19 @@ database.create()
 del database
 
 if __name__ == "__main__":
-    app.run()
+    from gunicorn.app.base import Application
+
+    class GunicornApp(Application):
+        def __init__(self):
+            self.app = app
+            super().__init__()
+
+        def init(self, parser, opts, args):
+            if DEBUG:
+                self.cfg.set("reload", True)
+
+        def load(self):
+            return app
+
+    g = GunicornApp()
+    g.run()

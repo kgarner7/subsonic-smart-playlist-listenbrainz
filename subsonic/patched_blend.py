@@ -8,6 +8,8 @@ from troi.patches.lb_radio_classes.blend import WeighAndBlendRecordingsElement
 
 
 class WeightAndBlendAllowExcessArtistsToHitTarget(WeighAndBlendRecordingsElement):
+    """This is a patched blend that allows duplicate artists"""
+
     MAX_DEPTH = 15
 
     def read(self, entities: List[List["Recording"]], depth=0):

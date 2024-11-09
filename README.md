@@ -83,10 +83,11 @@ bun run build
 To run this app natively, just do
 
 ```bash
-gunicorn main:app
+python3 main.py
 ```
 
-To change application settings (e.g. caching), modify the `.env` file, and to change server settings, modify `gunicorn.conf.py`
+To change application settings (e.g. caching), modify the `.env` file, and to change server settings, modify `gunicorn.conf.py`.
+It is recommended to remove `reload` from `gunicorn.conf.py` (or use `gunicorn.conf.prod.py`)
 
 ## Usage
 

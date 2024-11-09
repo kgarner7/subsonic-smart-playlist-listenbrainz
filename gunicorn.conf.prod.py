@@ -5,5 +5,3 @@ errorlog = "-"
 loglevel = "info"
 accesslog = "-"
 preload_app = True
-
-reload = True
