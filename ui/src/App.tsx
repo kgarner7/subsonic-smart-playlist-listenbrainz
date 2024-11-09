@@ -178,13 +178,20 @@ const App = () => {
     if (artistTags?.artists) {
       const func = sortFunc(artistSort);
 
-      return artistTags.artists.sort(func).map((item) => ({
-        label:
-          item.subsonic_name && item.subsonic_name !== item.name
-            ? `${item.subsonic_name} ⋅ ${item.name}`
-            : item.name,
-        value: item.mbid,
-      }));
+      return artistTags.artists
+        .map((item) => ({
+          count: item.count,
+          name:
+            item.subsonic_name && item.subsonic_name !== item.name
+              ? `${item.subsonic_name} ⋅ ${item.name}`
+              : item.name,
+          mbid: item.mbid,
+        }))
+        .sort(func)
+        .map((item) => ({
+          label: item.name,
+          value: item.mbid,
+        }));
     }
 
     return [];
