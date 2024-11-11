@@ -22,7 +22,7 @@ export interface Prompt {
 }
 
 export interface Session {
-  id: string;
+  id: number;
   type: PromptType.SESSION;
 }
 
