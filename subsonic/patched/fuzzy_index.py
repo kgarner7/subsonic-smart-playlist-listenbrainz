@@ -3,6 +3,9 @@ from typing import Dict, List
 from troi.content_resolver.model.recording import Recording
 
 
+__all__ = ["FuzzyIndex"]
+
+
 class FuzzyIndex:
     """
     The original Troi Fuzzy Index is based off of matches. Since everything is exact, we

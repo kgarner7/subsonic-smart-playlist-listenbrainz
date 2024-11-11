@@ -4,6 +4,10 @@ from troi.content_resolver import artist_search
 from troi.content_resolver.model.database import db
 from troi.content_resolver.utils import select_recordings_on_popularity
 
+from .exclude import excluded_mbids
+
+__all__ = ["MultivaluedLocalRecordingSearchByArtistService"]
+
 
 class MultivaluedLocalRecordingSearchByArtistService(
     artist_search.LocalRecordingSearchByArtistService

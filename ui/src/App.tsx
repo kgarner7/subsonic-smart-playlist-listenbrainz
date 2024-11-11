@@ -15,13 +15,14 @@ import {
   APIResponse,
   isError,
   ScanStatus,
+  Session,
   SortDirection,
   SortInfo,
   SortType,
   Tags,
 } from "./types";
 import { sortFunc, SCAN_INTERVAL_MS, getBool, isScanning } from "./util";
-import { TagContext } from "./contexts/tag-context";
+import { TagContext, TagContextProps } from "./contexts/tag-context";
 import { AppHeader } from "./header/app-header";
 
 const LoginForm = lazy(() => import("./login"));
@@ -53,6 +54,7 @@ const App = () => {
   const [showText, setShowText] = useState(getPreferredTextMode());
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
   const [artistTags, setArtistTags] = useState<Tags | null>(null);
+  const [sessions, setSessions] = useState<Session[] | null>(null);
 
   const [artistSort, setArtistSort] = useState<SortInfo>({
     direction: SortDirection.ASCENDING,
@@ -133,17 +135,28 @@ const App = () => {
     return tags !== null;
   }, [makeRequest]);
 
+  const fetchSessions = useCallback(async () => {
+    const sessions = await makeRequest<Session[]>("session");
+    setSessions(sessions);
+    return sessions != null;
+  }, [makeRequest]);
+
   useEffect(() => {
     if (window.__authenticated__) {
       fetchScanStatus()
         .then(async (scan) => {
           if (scan !== null) {
-            return await fetchTags();
+            const tags = await fetchTags();
+            if (tags) {
+              return await fetchSessions();
+            }
+
+            return false;
           }
         })
         .catch(console.error);
     }
-  }, [fetchScanStatus, fetchTags]);
+  }, [fetchScanStatus, fetchSessions, fetchTags]);
 
   const handlePeriodicScan = useCallback(async () => {
     const status = await fetchScanStatus();
@@ -162,7 +175,7 @@ const App = () => {
   const fetchMetadata = useCallback(async () => {
     const status = await fetchScanStatus();
     if (status) {
-      await fetchTags();
+      await Promise.all([fetchTags(), fetchSessions()]);
 
       if (isScanning(status)) {
         if (scanRef.current) {
@@ -172,7 +185,7 @@ const App = () => {
         scanRef.current = setInterval(handlePeriodicScan, SCAN_INTERVAL_MS);
       }
     }
-  }, [fetchScanStatus, fetchTags, handlePeriodicScan]);
+  }, [fetchScanStatus, fetchSessions, fetchTags, handlePeriodicScan]);
 
   const artists = useMemo(() => {
     if (artistTags?.artists) {
@@ -210,6 +223,19 @@ const App = () => {
     return [];
   }, [artistTags?.tags, tagSort]);
 
+  const tagInfo = useMemo(
+    (): TagContextProps => ({
+      artistSort,
+      artists,
+      tagSort,
+      tags,
+      sessions,
+      setArtistSort,
+      setTagSort,
+    }),
+    [artistSort, artists, sessions, tagSort, tags]
+  );
+
   return (
     <ConfigProvider
       theme={{
@@ -233,16 +259,7 @@ const App = () => {
           <ScanContext.Provider
             value={{ scanRef, scanStatus, handlePeriodicScan, setScanStatus }}
           >
-            <TagContext.Provider
-              value={{
-                artistSort,
-                artists,
-                tagSort,
-                tags,
-                setArtistSort,
-                setTagSort,
-              }}
-            >
+            <TagContext.Provider value={tagInfo}>
               <Layout id="layout">
                 <AppHeader />
                 <Content id="content">

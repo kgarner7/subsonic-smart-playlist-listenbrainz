@@ -1,122 +1,176 @@
-from typing import Dict, List
+from typing import Dict, List, NotRequired, Optional, TypedDict
 
+from datetime import datetime
 from os import environ
 
-from importlib.util import module_from_spec, spec_from_file_location
 from json import loads, dumps
-from sys import modules, stdin
+from sys import stdin
+from subsonic.patched.monkeypatch import monkeypatch
 
+# Monkeypatch. This overrides fuzzy index to always use MBID (or lookup MBID).
+# This allows for importing Troi without scikit-learn/numpy
+monkeypatch("troi.content_resolver.fuzzy_index", "subsonic/patched/fuzzy_index.py")
 
-fuzzy_spec = spec_from_file_location(
-    "troi.content_resolver.fuzzy_index", "subsonic/fuzzy_index.py"
-)
-fuzzy_module = module_from_spec(fuzzy_spec)
-modules["troi.content_resolver.fuzzy_index"] = fuzzy_module
-fuzzy_spec.loader.exec_module(fuzzy_module)
+from subsonic.patched.exclude import excluded_mbids
+from subsonic.patched.patch import *
 
-from subsonic.patch import *
-
+from peewee import DoesNotExist
 from troi import Artist, ArtistCredit, Playlist, Recording, Release
 from troi.content_resolver.database import db
 from troi.content_resolver.lb_radio import ListenBrainzRadioLocal
 from troi.content_resolver.model.database import setup_db
 
 from subsonic.custom_connection import CustomConnection
+from subsonic.schema import CreateRadioWithCredentials, PromptType
+from subsonic.session import Session
+
 
 DATABASE_PATH = environ["DATABASE_PATH"]
 PROXY_IMAGES = environ.get("PROXY_IMAGES", "").lower() == "true"
 
 
+class MbzData(TypedDict):
+    mbid: str
+    name: str
+
+
+class RecordingData(TypedDict):
+    artists: NotRequired[List[MbzData]]
+    durationMs: int
+    id: str
+    mbid: str
+    release: NotRequired[MbzData]
+    title: str
+    url: str
+    year: int
+
+
+class RadioInfo(TypedDict):
+    name: str
+    recordings: List[RecordingData]
+    session: NotRequired[Optional[int]]
+
+
 def get_radio(
     mode: str, prompt: str, credentials: Dict[str, str], quiet=False
-) -> "dict":
+) -> Optional[RadioInfo]:
+    r = ListenBrainzRadioLocal(quiet)
+    data = r.generate(mode, prompt, 0.8)
+
     try:
-        setup_db(DATABASE_PATH)
-        db.connect()
+        _ = data.playlists[0].recordings[0]
+    except (KeyError, IndexError, AttributeError):
+        return None
 
-        r = ListenBrainzRadioLocal(quiet)
-        data = r.generate(mode, prompt, 0.8)
-        try:
-            _ = data.playlists[0].recordings[0]
-        except (KeyError, IndexError, AttributeError):
-            return {}
+    playlist: "Playlist" = data.playlists[0]
+    recordings: List["Recording"] = playlist.recordings
 
-        playlist: "Playlist" = data.playlists[0]
-        recordings: List["Recording"] = playlist.recordings
+    output_json: "List[RecordingData]" = []
 
-        output_json: "List[dict]" = []
+    if PROXY_IMAGES:
 
-        if PROXY_IMAGES:
+        def get_url(id: str):
+            return f"./api/proxy/{id}"
 
-            def get_url(id: str):
-                return f"./api/proxy/{id}"
+    else:
+        conn = CustomConnection(credentials=credentials)
 
-        else:
-            conn = CustomConnection(credentials=credentials)
+        def get_url(id: str):
+            req = conn._getRequest("getCoverArt.view", {"id": id, "size": 100})
+            return f"{req.full_url}?{req.data.decode()}"
 
-            def get_url(id: str):
-                req = conn._getRequest("getCoverArt.view", {"id": id, "size": 100})
-                return f"{req.full_url}?{req.data.decode()}"
+    for recording in recordings:
+        subsonic_id = recording.musicbrainz["subsonic_id"]
 
-        for recording in recordings:
-            subsonic_id = recording.musicbrainz["subsonic_id"]
+        recording_json = RecordingData(
+            durationMs=recording.duration,
+            id=subsonic_id,
+            mbid=recording.mbid,
+            title=recording.name,
+            url=get_url(subsonic_id),
+            year=recording.year,
+        )
 
-            recording_json = {
-                "durationMs": recording.duration,
-                "id": subsonic_id,
-                "mbid": recording.mbid,
-                "title": recording.name,
-                "url": get_url(subsonic_id),
-                "year": recording.year,
-            }
+        if recording.artist_credit:
+            credits: "ArtistCredit" = recording.artist_credit
+            artists: "List[Artist]" = credits.artists
 
-            if recording.artist_credit:
-                credits: "ArtistCredit" = recording.artist_credit
-                artists: "List[Artist]" = credits.artists
+            recording_json["artists"] = [
+                MbzData(mbid=artist.mbid, name=artist.name) for artist in artists
+            ]
 
-                recording_json["artists"] = [
-                    {"mbid": artist.mbid, "name": artist.name} for artist in artists
-                ]
+        if recording.release:
+            release: "Release" = recording.release
+            recording_json["release"] = MbzData(mbid=release.mbid, name=release.name)
 
-            if recording.release:
-                release: "Release" = recording.release
-                recording_json["release"] = {"mbid": release.mbid, "name": release.name}
+        output_json.append(recording_json)
 
-            output_json.append(recording_json)
+    return {
+        "name": playlist.name,
+        "recordings": output_json,
+    }
 
-        return {
-            "name": playlist.name,
-            "recordings": output_json,
-        }
-    finally:
-        db.close()
-
-
-ALLOWED_MODES = {"easy", "medium", "hard"}
 
 if __name__ == "__main__":
-    params = loads(stdin.readline())
-    mode = params["mode"]
+    data = loads(stdin.readline())
+    json = CreateRadioWithCredentials().load(data)
 
-    if mode not in ALLOWED_MODES:
-        raise Exception(f"Unexpected mode {mode}")
+    credentials = json["credentials"]
+    prompt = json["prompt"]
 
-    prompt = params["prompt"]
-    assert isinstance(prompt, str), "Invalid prompt"
+    setup_db(DATABASE_PATH)
+    db.connect()
 
-    credentials = params["credentials"]
-    assert isinstance(credentials, dict)
+    is_session = prompt["type"] == PromptType.SESSION.value
 
-    quiet = params.get("quiet", False)
-    if quiet == "false" or quiet == "False" or quiet == False:
-        quiet = False
+    if is_session:
+        try:
+            session: "Session" = (
+                Session.select(Session.mode, Session.prompt, Session.seen.json())
+                .where(Session.username == credentials["u"], Session.id == prompt["id"])
+                .get()
+            )
+            create_session = False
+
+            mode = session.mode
+            text = session.prompt
+            if session.seen:
+                excluded_mbids.update(session.seen)
+        except DoesNotExist:
+            raise Exception(f"No session with id {prompt["id"]}")
     else:
-        quiet = bool(quiet)
+        mode = prompt["mode"]
+        text = prompt["prompt"]
+        create_session = prompt.get("create_session", False)
 
-    for key, value in credentials.items():
-        assert isinstance(key, str) and isinstance(
-            value, str
-        ), "credentials must be string"
+    results = get_radio(mode, text, credentials, json.get("quiet", False))
 
-    results = get_radio(mode, prompt, credentials)
+    if results is None:
+        raise Exception(1)
+
+    if create_session:
+        if len(results["recordings"]) < 50:
+            results["session"] = None
+        else:
+            seen_ids = [r["mbid"] for r in results["recordings"]]
+            id = Session.insert(
+                username=credentials["u"],
+                name=results["name"],
+                prompt=prompt,
+                mode=mode,
+                seen=seen_ids,
+                last_updated=datetime.now(),
+            )
+            results["session"] = id
+    elif is_session:
+        if len(results["recordings"]) < 50:
+            Session.delete_by_id(prompt["id"]).execute()
+            results["session"] = None
+        else:
+            seen_ids = [r["mbid"] for r in results["recordings"]]
+            Session.update(seen=Session.seen.set(session.seen + seen_ids)).where(
+                Session.id == prompt["id"]
+            ).execute()
+            results["session"] = prompt["id"]
+
     print(dumps(results), end="")

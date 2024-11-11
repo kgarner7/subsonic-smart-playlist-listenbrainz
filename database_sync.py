@@ -3,14 +3,15 @@ from typing import Dict, List, Set, Tuple
 from datetime import datetime
 from os import environ
 
+from subsonic.artist import Artist as DBArtist, RecordingArtist
+from subsonic.database import ArtistSubsonicDatabase
+from subsonic.patched.patch import BatchedLookupWithExclude
+
 from troi import Artist, ArtistCredit, Recording, Release
 from troi.content_resolver.database import db
 from troi.content_resolver.metadata_lookup import MetadataLookup, RecordingRow
 from troi.content_resolver.model.recording import Recording as DBRecording, FileIdType
 
-from subsonic.artist import Artist as DBArtist, RecordingArtist
-from subsonic.database import ArtistSubsonicDatabase
-from subsonic.patched_lookup import FixedLookup
 
 SUBSONIC_BACKEND_USER = environ["SUBSONIC_BACKEND_USER"]
 SUBSONIC_BACKEND_PASS = environ["SUBSONIC_BACKEND_PASS"]
@@ -26,11 +27,13 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
 
         # Lookups
         self.metadata_lookup = MetadataLookup(True)
-        self.recording_lookup = FixedLookup()
+        self.recording_lookup = BatchedLookupWithExclude()
 
         # Store existing ids
         self.existing_artists: Set[str] = set()
-        self.existing_artist_mbids_to_subsonic: Dict[str, str | None] = dict()
+        self.existing_artist_mbids_to_subsonic: Dict[str, Tuple[str, str] | None] = (
+            dict()
+        )
         self.existing_mbid_subsonic_id_to_id: Dict[Tuple[str, str], int] = {}
         self.existing_subsonic_id_to_mbid: Dict[str, str] = {}
         self.seen_existing_ids: Set[str] = set()
@@ -81,14 +84,22 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                     if mbid:
                         if mbid in self.existing_artist_mbids_to_subsonic:
                             existing = self.existing_artist_mbids_to_subsonic[mbid]
-                            if existing != artist["name"]:
+                            if existing is None or (
+                                existing[0] != artist["name"]
+                                or existing[1] != artist["id"]
+                            ):
                                 artist_updates.append(
-                                    DBArtist(mbid=mbid, subsonic_name=artist["name"])
+                                    DBArtist(
+                                        mbid=mbid,
+                                        subsonic_name=artist["name"],
+                                        subsonic_id=artist["id"],
+                                    )
                                 )
                         else:
-                            self.existing_artist_mbids_to_subsonic[mbid] = artist[
-                                "name"
-                            ]
+                            self.existing_artist_mbids_to_subsonic[mbid] = (
+                                artist["name"],
+                                artist["id"],
+                            )
 
             if artist_updates:
                 with db.atomic():
@@ -164,9 +175,14 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                 (recording.file_id, recording.recording_mbid)
             ] = recording.id
 
-        for artist in DBArtist.select(DBArtist.mbid, DBArtist.subsonic_name):
+        for artist in DBArtist.select(
+            DBArtist.mbid, DBArtist.subsonic_name, DBArtist.subsonic_id
+        ):
             self.existing_artists.add(artist.mbid)
-            self.existing_artist_mbids_to_subsonic[artist.mbid] = artist.subsonic_name
+            self.existing_artist_mbids_to_subsonic[artist.mbid] = (
+                artist.subsonic_name,
+                artist.subsonic_id,
+            )
 
     def lookup_and_resolve_songs_metadata(self, songs: List[dict]) -> None:
         # 1. Bulk lookup the metadata from ListenBrainz
@@ -238,11 +254,20 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                             if artist.mbid not in self.existing_artists:
                                 self.existing_artists.add(artist.mbid)
 
+                                existing_data = (
+                                    self.existing_artist_mbids_to_subsonic.get(
+                                        artist.mbid
+                                    )
+                                )
+
                                 DBArtist.insert(
                                     mbid=artist.mbid,
                                     name=artist.name,
-                                    subsonic_name=self.existing_artist_mbids_to_subsonic.get(
-                                        artist.mbid
+                                    subsonic_name=(
+                                        None if not existing_data else existing_data[0]
+                                    ),
+                                    subsonic_id=(
+                                        None if not existing_data else existing_data[1]
                                     ),
                                 ).execute()
                     else:

@@ -8,6 +8,7 @@ declare global {
 
 export interface APIError {
   error: string;
+  code: number;
 }
 
 export type APIResponse<T> = T | APIError;
@@ -31,6 +32,7 @@ export interface Artist {
   mbid: string;
   name: string;
   subsonic_name: string | null;
+  subsonic_id: string | null;
 }
 
 export interface Tags {
@@ -82,3 +84,9 @@ export interface Playlist {
 }
 
 export type PlaylistResponse = [Playlist, string];
+
+export interface Session {
+  id: string;
+  name: string;
+  seen: number;
+}

@@ -6,6 +6,8 @@ from random import randint
 from troi import Recording
 from troi.patches.lb_radio_classes.blend import WeighAndBlendRecordingsElement
 
+__all__ = ["WeightAndBlendAllowExcessArtistsToHitTarget"]
+
 
 class WeightAndBlendAllowExcessArtistsToHitTarget(WeighAndBlendRecordingsElement):
     """This is a patched blend that allows duplicate artists"""

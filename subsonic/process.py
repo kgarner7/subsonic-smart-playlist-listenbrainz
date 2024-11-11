@@ -1,3 +1,11 @@
+from typing import TypedDict
+
+
+class ScanState(TypedDict):
+    fetched: int
+    scanning: bool
+
+
 from multiprocessing.sharedctypes import SynchronizedArray
 
 from concurrent.futures import ThreadPoolExecutor
@@ -14,7 +22,7 @@ class MetadataHandler:
 
         super().__init__()
 
-    def get_state_json(self) -> dict:
+    def get_state_json(self) -> ScanState:
         with self.scanStatus.get_lock():
             return {"fetched": self.scanStatus[0], "scanning": bool(self.scanStatus[1])}
 

@@ -3,3 +3,29 @@ export enum FormItemType {
   GENRE = "genre",
 }
   
+export enum Difficulty {
+  EASY = "easy",
+  MEDIUM = "medium",
+  HARD = "hard",
+}
+
+export enum PromptType {
+  PROMPT = "prompt",
+  SESSION = "session",
+}
+
+export interface Prompt {
+  mode: Difficulty;
+  prompt: string;
+  session?: boolean;
+  type: PromptType.PROMPT;
+}
+
+export interface Session {
+  id: string;
+  type: PromptType.SESSION;
+}
+
+export interface RadioCreate {
+  prompt: Prompt | Session;
+}

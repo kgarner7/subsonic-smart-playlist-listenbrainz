@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, TypedDict
 
 from os import environ
 
@@ -8,6 +8,7 @@ from troi.content_resolver.model.database import setup_db
 
 from .artist import Artist, RecordingArtist
 from .custom_connection import CustomConnection
+from .session import Session
 
 SUBSONIC_BACKEND_USER = environ["SUBSONIC_BACKEND_USER"]
 SUBSONIC_BACKEND_PASS = environ["SUBSONIC_BACKEND_PASS"]
@@ -24,7 +25,7 @@ class ArtistSubsonicDatabase(SubsonicDatabase):
     def create(self):
         super().create()
         # Additional tables we want to keep track of resolved artists
-        db.create_tables((Artist, RecordingArtist))
+        db.create_tables((Artist, RecordingArtist, Session))
 
     def connect(self):
         return CustomConnection(
@@ -32,26 +33,46 @@ class ArtistSubsonicDatabase(SubsonicDatabase):
         )
 
 
-def get_metadata() -> dict:
+class ArtistMetadata(TypedDict):
+    count: int
+    mbid: str
+    name: str
+    subsonic_id: Optional[str]
+    subsonic_name: Optional[str]
+
+
+class TagMetadata(TypedDict):
+    count: int
+    name: str
+
+
+class Metadata(TypedDict):
+    artists: List[ArtistMetadata]
+    resolved_recordings: int
+    tags: List[TagMetadata]
+
+
+def get_metadata() -> Metadata:
     try:
         setup_db(DATABASE_PATH)
         db.connect()
 
         with db.atomic():
             query = """
-SELECT name, mbid, subsonic_name, COUNT(recording_artist.recording_id)
+SELECT name, mbid, subsonic_name, subsonic_id, COUNT(recording_artist.recording_id)
 FROM artist
 JOIN recording_artist
     ON recording_artist.artist_id = artist.mbid
 GROUP BY recording_artist.artist_id"""
-            artists: List[dict] = []
+            artists: List[ArtistMetadata] = []
             cursor = db.execute_sql(query)
-            for name, mbid, subsonic_name, count in cursor.fetchall():
+            for name, mbid, subsonic_name, subsonic_id, count in cursor.fetchall():
                 artists.append(
                     {
                         "name": name,
                         "mbid": mbid,
                         "subsonic_name": subsonic_name,
+                        "subsonic_id": subsonic_id,
                         "count": count,
                     }
                 )
@@ -68,7 +89,7 @@ ORDER BY cnt DESC"""
 
             cursor = db.execute_sql(query)
 
-            tags: List[dict] = []
+            tags: List[TagMetadata] = []
             for rec in cursor.fetchall():
                 tags.append({"name": rec[0], "count": rec[1]})
 
@@ -81,5 +102,19 @@ ORDER BY cnt DESC"""
             "resolved_recordings": resolved_recordings,
             "tags": tags,
         }
+    finally:
+        db.close()
+
+
+def get_sessions(username: str) -> List[dict]:
+    try:
+        setup_db(DATABASE_PATH)
+        db.connect()
+
+        return list(
+            Session.select(Session.id, Session.name, Session.seen.length())
+            .where(Session.username == username)
+            .dicts()
+        )
     finally:
         db.close()

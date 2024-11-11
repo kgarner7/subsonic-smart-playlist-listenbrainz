@@ -13,8 +13,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-deps --no-cache-dir -r requirements.txt
 
-COPY database_sync.py get_radio.py main.py .
-COPY gunicorn.conf.prod.py gunicorn.conf.py
+COPY database_sync.py get_radio.py gunicorn.conf.py main.py .
 COPY subsonic subsonic
 COPY --from=builder /ui/dist/ ui/dist
 

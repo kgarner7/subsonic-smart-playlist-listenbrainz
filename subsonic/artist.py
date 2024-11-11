@@ -17,9 +17,10 @@ class Artist(Model):
     mbid = TextField(primary_key=True)
     name = TextField(null=False)
     subsonic_name = TextField(null=True)
+    subsonic_id = TextField(null=True)
 
     def __repr__(self) -> str:
-        return f"<Artist('{self.mbid}', '{self.name}', '{self.subsonic_name}')>"
+        return f"<Artist('{self.mbid}', '{self.name}', '{self.subsonic_name}', '{self.subsonic_id}')>"
 
 
 class RecordingArtist(Model):
