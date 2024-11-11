@@ -1,5 +1,5 @@
 from peewee import *
-from playhouse.sqlite_ext import JSONBField
+from playhouse.sqlite_ext import JSONField
 from troi.content_resolver.model.database import db
 
 __all__ = ["Session"]
@@ -20,7 +20,7 @@ class Session(Model):
     name = TextField(null=False)
     prompt = TextField(null=False)
     mode = TextField(null=False)
-    seen = JSONBField(null=True)
+    seen = JSONField(null=True)
     last_updated = DateTimeField()
 
     def __repr__(self) -> str:

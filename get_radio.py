@@ -126,7 +126,7 @@ if __name__ == "__main__":
     if is_session:
         try:
             session: "Session" = (
-                Session.select(Session.mode, Session.prompt, Session.seen.json())
+                Session.select(Session.mode, Session.prompt, Session.seen)
                 .where(Session.username == credentials["u"], Session.id == prompt["id"])
                 .get()
             )
