@@ -139,14 +139,18 @@ if __name__ == "__main__":
         except DoesNotExist:
             raise Exception(f"No session with id {prompt["id"]}")
     else:
-        mode = prompt["mode"]
+        mode = prompt["mode"].value
         text = prompt["prompt"]
-        create_session = prompt.get("create_session", False)
+        create_session = prompt.get("session", False)
 
     results = get_radio(mode, text, credentials, json.get("quiet", False))
 
     if results is None:
-        raise Exception(1)
+        if is_session:
+            Session.delete_by_id(prompt["id"])
+            raise Exception("This session has exhausted all available songs")
+
+        raise Exception("Could not find any tracks to create a playlist")
 
     if create_session:
         if len(results["recordings"]) < 50:
@@ -156,11 +160,11 @@ if __name__ == "__main__":
             id = Session.insert(
                 username=credentials["u"],
                 name=results["name"],
-                prompt=prompt,
+                prompt=text,
                 mode=mode,
                 seen=seen_ids,
                 last_updated=datetime.now(),
-            )
+            ).execute()
             results["session"] = id
     elif is_session:
         if len(results["recordings"]) < 50:

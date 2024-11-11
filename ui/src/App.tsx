@@ -12,6 +12,7 @@ import { AppContext } from "./contexts/app-context";
 import { ScanContext } from "./contexts/scan-context";
 import { NotifyContext } from "./contexts/notify-context";
 import {
+  APIError,
   APIResponse,
   isError,
   ScanStatus,
@@ -54,7 +55,7 @@ const App = () => {
   const [showText, setShowText] = useState(getPreferredTextMode());
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
   const [artistTags, setArtistTags] = useState<Tags | null>(null);
-  const [sessions, setSessions] = useState<Session[] | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
 
   const [artistSort, setArtistSort] = useState<SortInfo>({
     direction: SortDirection.ASCENDING,
@@ -78,7 +79,8 @@ const App = () => {
     async <T,>(
       endpoint: string,
       method = "GET",
-      body: object | undefined = undefined
+      body: object | undefined = undefined,
+      handler?: (error: APIError) => void
     ): Promise<T | null> => {
       try {
         const response = await fetch(`./api/${endpoint}`, {
@@ -105,7 +107,12 @@ const App = () => {
         const data = (await response.json()) as APIResponse<T>;
 
         if (isError(data)) {
-          throw new Error(data.error);
+          if (handler) {
+            handler(data);
+            return null;
+          } else {
+            throw new Error(data.error);
+          }
         }
 
         return data;
@@ -137,7 +144,7 @@ const App = () => {
 
   const fetchSessions = useCallback(async () => {
     const sessions = await makeRequest<Session[]>("session");
-    setSessions(sessions);
+    setSessions(sessions ?? []);
     return sessions != null;
   }, [makeRequest]);
 
@@ -231,6 +238,7 @@ const App = () => {
       tags,
       sessions,
       setArtistSort,
+      setSessions,
       setTagSort,
     }),
     [artistSort, artists, sessions, tagSort, tags]

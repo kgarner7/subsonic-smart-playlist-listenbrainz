@@ -1,4 +1,5 @@
 import { createContext, Dispatch, SetStateAction } from "react";
+import { APIError } from "../types";
 
 export interface AppContextState {
   authenticated: boolean;
@@ -10,7 +11,8 @@ export interface AppContextState {
   makeRequest: <T>(
     endpoint: string,
     method?: string,
-    body?: object | undefined
+    body?: object | undefined,
+    handler?: (error: APIError) => void
   ) => Promise<T | null>;
   setDark: Dispatch<SetStateAction<boolean>>;
   setShowText: Dispatch<SetStateAction<boolean>>;

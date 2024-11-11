@@ -8,7 +8,6 @@ declare global {
 
 export interface APIError {
   error: string;
-  code: number;
 }
 
 export type APIResponse<T> = T | APIError;
@@ -81,12 +80,13 @@ export interface Recording {
 export interface Playlist {
   name: string;
   recordings: Recording[];
+  session?: number;
 }
 
 export type PlaylistResponse = [Playlist, string];
 
 export interface Session {
-  id: string;
+  id: number;
   name: string;
   seen: number;
 }

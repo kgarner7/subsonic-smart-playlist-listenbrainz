@@ -1,5 +1,5 @@
 import { Button, Collapse, Form, Typography } from "antd";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
 import { PlaylistResponse } from "../types";
 import { FormRowData } from "./form-item";
@@ -12,7 +12,7 @@ const { Item } = Form;
 const { Title, Text } = Typography;
 
 interface SessionData {
-  session: string;
+  session: number;
   type: PromptType.SESSION;
 }
 
@@ -20,6 +20,7 @@ interface PromptData {
   advanced?: boolean;
   mode: Difficulty;
   rules: FormRowData[];
+  session?: boolean;
   type: PromptType.PROMPT;
 }
 
@@ -35,22 +36,30 @@ export interface PlaylistFormProps {
 }
 
 const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
-  const { sessions } = useTagContext();
+  const { sessions, setSessions } = useTagContext();
   const notify = useNotifyContext();
   const { makeRequest } = useAppContext();
 
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState<PromptType>();
+  const [type, setType] = useState<PromptType>(PromptType.PROMPT);
+  const [form] = Form.useForm<FormData>();
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      setType(PromptType.PROMPT);
+    }
+  }, [sessions.length]);
 
   const submit = useCallback(
     async (data: FormData) => {
+      console.log(data);
       setLoading(true);
 
       try {
         let body: RadioCreate;
 
         if (data.type === PromptType.PROMPT) {
-          const { advanced, mode, rules } = data;
+          const { advanced, mode, rules, session } = data;
 
           let prompt: string;
 
@@ -83,7 +92,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
           }
 
           body = {
-            prompt: { type: PromptType.PROMPT, mode, prompt },
+            prompt: { type: PromptType.PROMPT, mode, prompt, session },
           };
         } else {
           body = { prompt: { type: PromptType.SESSION, id: data.session } };
@@ -92,16 +101,65 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         const response = await makeRequest<PlaylistResponse>(
           "radio",
           "POST",
-          body
+          body,
+          (error) => {
+            if (data.type === PromptType.SESSION) {
+              setSessions((sesss) =>
+                sesss.filter((sess) => sess.id !== data.session)
+              );
+
+              notify.error({
+                message: "This session has finished",
+                description:
+                  "All possible tracks have been excluded, no more songs to fetch. Deleting this session",
+                placement: "top",
+              });
+            } else {
+              notify.error({
+                message: "Failed to generate playlist",
+                description: error.error,
+                placement: "top",
+              });
+            }
+          }
         );
 
         if (response !== null) {
-          notify.success({
-            message: "Playlist successfully generated",
-            description: response[0].name,
-            placement: "top",
-          });
+          if (data.type === PromptType.PROMPT && data.session) {
+            if (response[0].session !== undefined) {
+              setSessions((sessions) =>
+                sessions.concat([
+                  {
+                    name: response[0].name,
+                    id: response[0].session!,
+                    seen: 50,
+                  },
+                ])
+              );
+
+              notify.success({
+                message: "Playlist successfully generated",
+                description: response[0].name,
+                placement: "top",
+              });
+            } else {
+              notify.warning({
+                message: "Playlist successfully generated",
+                description: `New playlist ${response[0].name}. However, as there are fewer than 50 tracks, a radio session was not created`,
+                placement: "top",
+              });
+            }
+          } else {
+            notify.success({
+              message: "Playlist successfully generated",
+              description: response[0].name,
+              placement: "top",
+            });
+          }
+
           onSuccess(response);
+
+          form.resetFields();
         }
       } catch (error) {
         notify.error({
@@ -113,11 +171,15 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         setLoading(false);
       }
     },
-    [makeRequest, notify, onSuccess]
+    [makeRequest, notify, onSuccess, setSessions]
   );
 
   return (
-    <Form<FormData> initialValues={{ rules: [{}] }} onFinish={submit}>
+    <Form<FormData>
+      initialValues={{ rules: [{}] }}
+      onFinish={submit}
+      form={form}
+    >
       <Collapse
         items={[
           {
@@ -195,26 +257,24 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
           },
         ]}
       ></Collapse>
-      {sessions?.length && (
-        <>
-          <br />
-          <Item<PromptType>
-            name="type"
-            label="Prompt type"
-            rules={[{ required: true }]}
-          >
-            <Select<PromptType>
-              options={PromptOptions}
-              value={type}
-              onChange={setType}
-            />
-          </Item>
-        </>
-      )}
-      {!!sessions?.length && type === PromptType.SESSION && (
+      <br />
+      <Item<PromptType>
+        name="type"
+        label="Prompt type"
+        rules={[{ required: true }]}
+        hidden={sessions.length === 0}
+        initialValue={type}
+      >
+        <Select<PromptType>
+          options={PromptOptions}
+          value={type}
+          onChange={setType}
+        />
+      </Item>
+      {!!sessions.length && type === PromptType.SESSION && (
         <SessionForm sessions={sessions} />
       )}
-      {!sessions?.length || (type === PromptType.PROMPT && <PromptForm />)}
+      {(!sessions.length || type === PromptType.PROMPT) && <PromptForm />}
       <Item>
         <Button type="primary" htmlType="submit" block loading={loading}>
           Submit
