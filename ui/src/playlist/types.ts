@@ -14,6 +14,28 @@ export enum PromptType {
   SESSION = "session",
 }
 
+export interface FormArtistData {
+  type: FormItemType.ARTIST;
+  artist: string;
+  similar?: boolean;
+  weight?: number;
+}
+
+export enum GenreMode {
+  ALL = "and",
+  ANY = "or",
+}
+
+export interface FormGenreData {
+  type: FormItemType.GENRE;
+  genre: string[];
+  weight?: number;
+  join?: GenreMode;
+  similar?: boolean;
+}
+
+export type FormRowData = FormArtistData | FormGenreData;
+
 export interface Prompt {
   mode: Difficulty;
   prompt: string;
@@ -29,3 +51,18 @@ export interface Session {
 export interface RadioCreate {
   prompt: Prompt | Session;
 }
+
+export interface SessionData {
+  session: number;
+  type: PromptType.SESSION;
+}
+
+export interface PromptData {
+  advanced?: boolean;
+  mode: Difficulty;
+  rules: FormRowData[];
+  session?: boolean;
+  type: PromptType.PROMPT;
+}
+
+export type FormData = PromptData | SessionData;

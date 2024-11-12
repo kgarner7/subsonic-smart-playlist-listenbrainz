@@ -118,3 +118,13 @@ def get_sessions(username: str) -> List[dict]:
         )
     finally:
         db.close()
+
+
+def delete_session(username: str, id: int) -> None:
+    try:
+        setup_db(DATABASE_PATH)
+        db.connect()
+
+        Session.delete().where(Session.username == username, Session.id == id).execute()
+    finally:
+        db.close()

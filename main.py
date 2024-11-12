@@ -4,7 +4,12 @@ load_dotenv()
 
 from os import environ
 
-from subsonic.database import ArtistSubsonicDatabase, get_metadata, get_sessions
+from subsonic.database import (
+    ArtistSubsonicDatabase,
+    delete_session,
+    get_metadata,
+    get_sessions,
+)
 from subsonic.process import MetadataHandler
 
 CACHE_TYPE = environ.get("CACHE_TYPE", "filesystem")
@@ -178,6 +183,16 @@ def create_app():
         resp = conn.createPlaylist(name=json["name"], songIds=json["ids"])
 
         return {"id": resp["playlist"]["id"]}, 200
+
+    @app.delete("/api/deleteSession/<int:id>")
+    @login_or_credentials_required
+    def destroy_session(credentials, id):
+        try:
+            delete_session(credentials["u"], id)
+            return {}, 200
+        except BaseException as e:
+            print(e)
+            return {"error": "Could not"}, 400
 
     @app.delete("/api/logout")
     @login_or_credentials_required

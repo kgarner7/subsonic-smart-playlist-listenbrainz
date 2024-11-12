@@ -2,7 +2,13 @@ import { Col, Select, Form, InputNumber, Checkbox } from "antd";
 import { DefaultOptionType } from "antd/es/select";
 import { useState } from "react";
 import { useTagContext } from "../contexts";
-import { FormItemType } from "./types";
+import {
+  FormArtistData,
+  FormGenreData,
+  FormItemType,
+  FormRowData,
+  GenreMode,
+} from "./types";
 
 const { Item } = Form;
 
@@ -22,32 +28,10 @@ const items: DefaultOptionType[] = [
   },
 ];
 
-enum GenreMode {
-  ALL = "and",
-  ANY = "or",
-}
-
 const GENRE_MODES: DefaultOptionType[] = [
   { label: "Select recordings with ALL of these tags", value: GenreMode.ALL },
   { label: "Select recordings with ANY of these tags", value: GenreMode.ANY },
 ];
-
-export interface FormArtistData {
-  type: FormItemType.ARTIST;
-  artist: string;
-  similar?: boolean;
-  weight?: number;
-}
-
-export interface FormGenreData {
-  type: FormItemType.GENRE;
-  genre: string[];
-  weight?: number;
-  join?: GenreMode;
-  similar?: boolean;
-}
-
-export type FormRowData = FormArtistData | FormGenreData;
 
 export const FormItem = ({ advanced, name }: FormItemProps) => {
   const tags = useTagContext();

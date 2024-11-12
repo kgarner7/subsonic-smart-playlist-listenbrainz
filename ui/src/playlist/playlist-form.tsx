@@ -1,30 +1,14 @@
-import { Button, Collapse, Form, Typography } from "antd";
+import { Button, Collapse, Form, Select, Typography } from "antd";
+import type { DefaultOptionType } from "antd/es/select";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
 import { PlaylistResponse } from "../types";
-import { FormRowData } from "./form-item";
-import { Difficulty, FormItemType, PromptType, RadioCreate } from "./types";
 import { PromptForm } from "./prompt-form";
-import Select, { DefaultOptionType } from "antd/es/select";
+import { FormData, FormItemType, PromptType, RadioCreate } from "./types";
 import { SessionForm } from "./session-form";
 
 const { Item } = Form;
 const { Title, Text } = Typography;
-
-interface SessionData {
-  session: number;
-  type: PromptType.SESSION;
-}
-
-interface PromptData {
-  advanced?: boolean;
-  mode: Difficulty;
-  rules: FormRowData[];
-  session?: boolean;
-  type: PromptType.PROMPT;
-}
-
-type FormData = PromptData | SessionData;
 
 const PromptOptions: DefaultOptionType[] = [
   { label: "New prompt", value: PromptType.PROMPT },
@@ -41,14 +25,14 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
   const { makeRequest } = useAppContext();
 
   const [loading, setLoading] = useState(false);
-  const [type, setType] = useState<PromptType>(PromptType.PROMPT);
   const [form] = Form.useForm<FormData>();
+  const type = Form.useWatch("type", form);
 
   useEffect(() => {
     if (sessions.length === 0) {
-      setType(PromptType.PROMPT);
+      form.setFieldValue("type", PromptType.PROMPT);
     }
-  }, [sessions.length]);
+  }, [form, sessions.length]);
 
   const submit = useCallback(
     async (data: FormData) => {
@@ -150,8 +134,20 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
               });
             }
           } else {
+            setSessions((sessions) =>
+              sessions.map((session) =>
+                session.id === data.session
+                  ? {
+                      id: session.id,
+                      name: session.name,
+                      seen: (session.seen += response[0].recordings.length),
+                    }
+                  : session
+              )
+            );
+
             notify.success({
-              message: "Playlist successfully generated",
+              message: "Successfully fetched",
               description: response[0].name,
               placement: "top",
             });
@@ -171,7 +167,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         setLoading(false);
       }
     },
-    [makeRequest, notify, onSuccess, setSessions]
+    [form, makeRequest, notify, onSuccess, setSessions]
   );
 
   return (
@@ -265,11 +261,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         hidden={sessions.length === 0}
         initialValue={type}
       >
-        <Select<PromptType>
-          options={PromptOptions}
-          value={type}
-          onChange={setType}
-        />
+        <Select<PromptType> options={PromptOptions} value={type} />
       </Item>
       {!!sessions.length && type === PromptType.SESSION && (
         <SessionForm sessions={sessions} />
