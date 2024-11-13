@@ -110,7 +110,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
 
         if (response !== null) {
           if (data.type === PromptType.PROMPT && data.session) {
-            if (response[0].session !== undefined) {
+            if (response[0].session) {
               setSessions((sessions) =>
                 sessions.concat([
                   {

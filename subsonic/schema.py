@@ -30,7 +30,8 @@ class IntOrString(Field):
 
 
 class CreatePlaylist(Schema):
-    name = String(required=True)
+    name = String()
+    id = String()
     ids = List(IntOrString, required=True, validate=Length(min=1))
 
 

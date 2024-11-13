@@ -25,6 +25,7 @@ import {
 import { sortFunc, SCAN_INTERVAL_MS, getBool, isScanning } from "./util";
 import { TagContext, TagContextProps } from "./contexts/tag-context";
 import { AppHeader } from "./header/app-header";
+import { ExistingPlaylist } from "./playlist/types";
 
 const LoginForm = lazy(() => import("./login"));
 const Playlist = lazy(() => import("./playlist"));
@@ -55,6 +56,7 @@ const App = () => {
   const [showText, setShowText] = useState(getPreferredTextMode());
   const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
   const [artistTags, setArtistTags] = useState<Tags | null>(null);
+  const [playlists, setPlaylists] = useState<ExistingPlaylist[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
   const [artistSort, setArtistSort] = useState<SortInfo>({
@@ -148,6 +150,12 @@ const App = () => {
     return sessions != null;
   }, [makeRequest]);
 
+  const fetchPlaylists = useCallback(async () => {
+    const playlists = await makeRequest<ExistingPlaylist[]>("playlists");
+    setPlaylists(playlists ?? []);
+    return playlists !== null;
+  }, [makeRequest]);
+
   useEffect(() => {
     if (window.__authenticated__) {
       fetchScanStatus()
@@ -182,7 +190,7 @@ const App = () => {
   const fetchMetadata = useCallback(async () => {
     const status = await fetchScanStatus();
     if (status) {
-      await Promise.all([fetchTags(), fetchSessions()]);
+      await Promise.all([fetchTags(), fetchSessions(), fetchPlaylists()]);
 
       if (isScanning(status)) {
         if (scanRef.current) {
@@ -192,7 +200,13 @@ const App = () => {
         scanRef.current = setInterval(handlePeriodicScan, SCAN_INTERVAL_MS);
       }
     }
-  }, [fetchScanStatus, fetchSessions, fetchTags, handlePeriodicScan]);
+  }, [
+    fetchPlaylists,
+    fetchScanStatus,
+    fetchSessions,
+    fetchTags,
+    handlePeriodicScan,
+  ]);
 
   const artists = useMemo(() => {
     if (artistTags?.artists) {
@@ -234,14 +248,16 @@ const App = () => {
     (): TagContextProps => ({
       artistSort,
       artists,
+      playlists,
       tagSort,
       tags,
       sessions,
       setArtistSort,
+      setPlaylists,
       setSessions,
       setTagSort,
     }),
-    [artistSort, artists, sessions, tagSort, tags]
+    [artistSort, artists, playlists, sessions, tagSort, tags]
   );
 
   return (

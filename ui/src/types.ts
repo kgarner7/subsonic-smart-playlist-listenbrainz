@@ -80,7 +80,7 @@ export interface Recording {
 export interface Playlist {
   name: string;
   recordings: Recording[];
-  session?: number;
+  session?: number | null;
 }
 
 export type PlaylistResponse = [Playlist, string];

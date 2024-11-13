@@ -66,3 +66,22 @@ export interface PromptData {
 }
 
 export type FormData = PromptData | SessionData;
+
+export interface ExistingPlaylist {
+  duration: number;
+  id: string;
+  name: string;
+  songs: number;
+}
+
+export interface CreatePlaylistFromName {
+  name: string;
+  ids: string[];
+}
+
+export interface UpdatePlaylistById {
+  id: string;
+  ids: string[];
+}
+
+export type CreatePlaylist = CreatePlaylistFromName | UpdatePlaylistById;

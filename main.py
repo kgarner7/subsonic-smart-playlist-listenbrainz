@@ -131,15 +131,31 @@ def create_app():
     def get_scan_status(_):
         return handler.get_state_json()
 
-    @app.get("/api/tags")
+    @app.get("/api/playlists")
     @login_or_credentials_required
-    def tags(_):
-        return get_metadata(), 200
+    def get_playlists(credentials):
+        conn = CustomConnection(credentials=credentials)
+        playlists = conn.getPlaylists()["playlists"]["playlist"]
+        minified = [
+            {
+                "id": playlist["id"],
+                "name": playlist["name"],
+                "songs": playlist["songCount"],
+                "duration": playlist["duration"],
+            }
+            for playlist in playlists
+        ]
+        return minified, 200
 
     @app.get("/api/session")
     @login_or_credentials_required
     def sessions(credentials):
         return get_sessions(credentials["u"]), 200
+
+    @app.get("/api/tags")
+    @login_or_credentials_required
+    def tags(_):
+        return get_metadata(), 200
 
     @app.post("/api/radio")
     @login_or_credentials_required
@@ -180,7 +196,13 @@ def create_app():
     @validate_schema(s.CreatePlaylist)
     def create_playlist(credentials, json: "dict"):
         conn = CustomConnection(credentials=credentials)
-        resp = conn.createPlaylist(name=json["name"], songIds=json["ids"])
+        if "id" in json == "name" in json:
+            return {"error": "You must provide EITHER playlist name OR id"}, 400
+
+        print(json)
+        resp = conn.createPlaylist(
+            name=json.get("name"), playlistId=json.get("id"), songIds=json["ids"]
+        )
 
         return {"id": resp["playlist"]["id"]}, 200
 

@@ -19,6 +19,8 @@ import {
   Form,
   Input,
   Row,
+  Select,
+  Switch,
   Table,
   TableColumnsType,
 } from "antd";
@@ -32,10 +34,24 @@ import {
 } from "react";
 import { Playlist, Recording } from "../types";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { useAppContext, useNotifyContext } from "../contexts";
+import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
 import { DeleteOutlined } from "@ant-design/icons";
+import { CreatePlaylist } from "./types";
+import { DefaultOptionType } from "antd/es/select";
 
 const { Item, useForm } = Form;
+
+const durationToString = (duration: number): string => {
+  const seconds = duration % 60;
+  duration = Math.floor(duration / 60);
+  const minutes = duration % 60;
+  duration = Math.floor(duration / 60);
+  const hours = duration % 24;
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
 
 interface RowProps extends HTMLAttributes<HTMLTableRowElement> {
   "data-row-key": string;
@@ -71,7 +87,20 @@ const RecordingRow: React.FC<Readonly<RowProps>> = (props) => {
   );
 };
 
-interface PlaylistWithId extends Playlist {
+interface PlaylistWithName extends Playlist {
+  existing: false;
+}
+
+interface PlaylistWithId extends Omit<Playlist, "name"> {
+  existing: true;
+  id: string;
+}
+
+type FormData =
+  | Omit<PlaylistWithName, "recordings">
+  | Omit<PlaylistWithId, "recordings">;
+
+interface PlaylistState extends Playlist {
   id?: string;
 }
 
@@ -80,26 +109,27 @@ export interface PlaylistDataProps {
   log: string;
 }
 
-type FormData = Omit<PlaylistWithId, "recordings">;
-
 export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
   const { showText, makeRequest } = useAppContext();
   const notify = useNotifyContext();
+  const { playlists, setPlaylists } = useTagContext();
   const [form] = useForm<FormData>();
-  const [data, setData] = useState<PlaylistWithId>(playlist);
+  const [data, setData] = useState<PlaylistState>(playlist);
   const [loading, setLoading] = useState(false);
+
+  const existing = Form.useWatch("existing", form);
 
   const reset = useCallback(() => {
     setData(playlist);
     form.setFieldsValue({
       name: playlist.name,
-      id: undefined,
+      existing: false,
     });
   }, [form, playlist]);
 
   useEffect(() => {
     reset();
-  }, [reset]);
+  }, [makeRequest, reset]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -185,17 +215,34 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
     return base;
   }, [data.id, remove, showText]);
 
+  const playlistOptions = useMemo(() => {
+    return playlists.map(
+      (playlist): DefaultOptionType => ({
+        label: `${playlist.name} (${playlist.songs} songs, ${durationToString(
+          playlist.duration
+        )})`,
+        value: playlist.id,
+      })
+    );
+  }, [playlists]);
+
   const submit = useCallback(
     async (formData: FormData) => {
       setLoading(true);
       try {
+        const ids = data.recordings.map((recording) => recording.id);
+
+        let body: CreatePlaylist;
+        if (formData.existing === true) {
+          body = { id: formData.id, ids };
+        } else {
+          body = { ids, name: formData.name };
+        }
+
         const resp = await makeRequest<{ id: string }>(
           "createPlaylist",
           "POST",
-          {
-            ids: data.recordings.map((recording) => recording.id),
-            name: formData.name,
-          }
+          body
         );
 
         if (resp !== null) {
@@ -209,7 +256,25 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
             placement: "top",
           });
 
-          form.setFieldValue("id", resp.id);
+          if (formData.existing) {
+            const duration = data.recordings.reduce(
+              (acc, recording) => acc + Math.round(recording.durationMs / 1000),
+              0
+            );
+
+            setPlaylists((existing) =>
+              existing.map((playlist) =>
+                playlist.id === formData.id
+                  ? {
+                      name: playlist.name,
+                      id: playlist.id,
+                      songs: data.recordings.length,
+                      duration,
+                    }
+                  : playlist
+              )
+            );
+          }
         }
       } catch (error) {
         notify.error({
@@ -221,7 +286,7 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
         setLoading(false);
       }
     },
-    [data.recordings, form, makeRequest, notify]
+    [data.recordings, makeRequest, notify, setPlaylists]
   );
 
   return (
@@ -237,35 +302,58 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
           ]}
         />
       </Item>
-      <Item
-        label="Playlist name"
-        name="name"
-        initialValue={playlist.name}
-        rules={[{ required: true }]}
-      >
-        <Input readOnly={!!data.id} />
-      </Item>
-      {data.id && (
-        <Item label="Playlist ID">
-          <Input readOnly value={data.id} />
-        </Item>
+      {data.id && <Item label="Your playlist ID">{data.id}</Item>}
+
+      {!data.id && (
+        <>
+          <Item
+            label="Use an existing playlist"
+            name="existing"
+            initialValue={false}
+          >
+            <Switch />
+          </Item>
+          {existing ? (
+            <Item
+              label="Existing playlist"
+              name="id"
+              rules={[{ required: true }]}
+            >
+              <Select options={playlistOptions} />
+            </Item>
+          ) : (
+            <Item
+              label="Playlist name"
+              name="name"
+              initialValue={playlist.name}
+              rules={[{ required: true }]}
+            >
+              <Input readOnly={!!data.id} />
+            </Item>
+          )}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Item>
+                <Button block onClick={reset}>
+                  Reset
+                </Button>
+              </Item>
+            </Col>
+            <Col span={12}>
+              <Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  block
+                  loading={loading}
+                >
+                  {existing ? "Update" : "Create"} Playlist
+                </Button>
+              </Item>
+            </Col>
+          </Row>
+        </>
       )}
-      <Row gutter={16}>
-        <Col span={12}>
-          <Item>
-            <Button block onClick={reset}>
-              Reset
-            </Button>
-          </Item>
-        </Col>
-        <Col span={12}>
-          <Item>
-            <Button type="primary" htmlType="submit" block loading={loading}>
-              Create Playlist
-            </Button>
-          </Item>
-        </Col>
-      </Row>
       <DndContext
         sensors={sensors}
         modifiers={[restrictToVerticalAxis]}
