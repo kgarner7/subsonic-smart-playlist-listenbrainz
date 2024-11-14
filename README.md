@@ -87,7 +87,6 @@ python3 main.py
 ```
 
 To change application settings (e.g. caching), modify the `.env` file, and to change server settings, modify `gunicorn.conf.py`.
-It is recommended to remove `reload` from `gunicorn.conf.py` (or use `gunicorn.conf.prod.py`)
 
 ## Usage
 
@@ -109,6 +108,8 @@ There are three steps:
 ## Development
 
 If you want to develop, follow the steps to install natively, then do the following in two separate windows:
+
+Make sure to set `MODE=debug` in your `.env` (or environment) to enable hot reloading of the backend.
 
 ```bash
 # From the base of the directory
