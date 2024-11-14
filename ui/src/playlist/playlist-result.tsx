@@ -302,7 +302,12 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
           ]}
         />
       </Item>
-      {data.id && <Item label="Your playlist ID">{data.id}</Item>}
+      {data.id && (
+        <>
+          <Item label="Your playlist name">{data.name}</Item>
+          <Item label="Your playlist ID">{data.id}</Item>
+        </>
+      )}
 
       {!data.id && (
         <>

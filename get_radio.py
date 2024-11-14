@@ -4,7 +4,6 @@ from datetime import datetime
 from os import environ
 
 from json import loads, dumps
-from sys import stdin
 from subsonic.patched.monkeypatch import monkeypatch
 
 # Monkeypatch. This overrides fuzzy index to always use MBID (or lookup MBID).
@@ -112,6 +111,8 @@ def get_radio(
 
 
 if __name__ == "__main__":
+    from sys import stdin
+
     data = loads(stdin.readline())
     json = CreateRadioWithCredentials().load(data)
 

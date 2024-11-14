@@ -156,23 +156,6 @@ const App = () => {
     return playlists !== null;
   }, [makeRequest]);
 
-  useEffect(() => {
-    if (window.__authenticated__) {
-      fetchScanStatus()
-        .then(async (scan) => {
-          if (scan !== null) {
-            const tags = await fetchTags();
-            if (tags) {
-              return await fetchSessions();
-            }
-
-            return false;
-          }
-        })
-        .catch(console.error);
-    }
-  }, [fetchScanStatus, fetchSessions, fetchTags]);
-
   const handlePeriodicScan = useCallback(async () => {
     const status = await fetchScanStatus();
 
@@ -207,6 +190,12 @@ const App = () => {
     fetchTags,
     handlePeriodicScan,
   ]);
+
+  useEffect(() => {
+    if (window.__authenticated__) {
+      fetchMetadata().catch(console.error);
+    }
+  }, [fetchMetadata]);
 
   const artists = useMemo(() => {
     if (artistTags?.artists) {

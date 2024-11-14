@@ -57,5 +57,6 @@ class MetadataHandler:
 
         errors = process.stderr.readlines()
 
-        print(errors)
+        if errors:
+            print("\n".join([error.decode() for error in errors]))
         self.scanStatus[1] = False

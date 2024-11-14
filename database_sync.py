@@ -13,9 +13,6 @@ from troi.content_resolver.metadata_lookup import MetadataLookup, RecordingRow
 from troi.content_resolver.model.recording import Recording as DBRecording, FileIdType
 
 
-SUBSONIC_BACKEND_USER = environ["SUBSONIC_BACKEND_USER"]
-SUBSONIC_BACKEND_PASS = environ["SUBSONIC_BACKEND_PASS"]
-
 DuplicateRecordings = Dict[str, List[dict]]
 
 

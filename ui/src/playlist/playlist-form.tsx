@@ -36,7 +36,6 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
 
   const submit = useCallback(
     async (data: FormData) => {
-      console.log(data);
       setLoading(true);
 
       try {
@@ -154,8 +153,6 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
           }
 
           onSuccess(response);
-
-          form.resetFields();
         }
       } catch (error) {
         notify.error({
@@ -167,7 +164,7 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
         setLoading(false);
       }
     },
-    [form, makeRequest, notify, onSuccess, setSessions]
+    [makeRequest, notify, onSuccess, setSessions]
   );
 
   return (
