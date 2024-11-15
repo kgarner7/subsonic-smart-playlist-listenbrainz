@@ -199,7 +199,6 @@ def create_app():
         if "id" in json == "name" in json:
             return {"error": "You must provide EITHER playlist name OR id"}, 400
 
-        print(json)
         resp = conn.createPlaylist(
             name=json.get("name"), playlistId=json.get("id"), songIds=json["ids"]
         )

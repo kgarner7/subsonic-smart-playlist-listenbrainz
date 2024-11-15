@@ -188,8 +188,10 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         # 2. Create or update the recording metadata and artists.
         metadata_to_fetch = self.process_recording_metadata(recordings, duplicates)
 
-        # 3. Lookup tags and popularity of stored tags
-        self.metadata_lookup.process_recordings(metadata_to_fetch)
+        # It's possible that this list is empty
+        if metadata_to_fetch:
+            # 3. Lookup tags and popularity of stored tags
+            self.metadata_lookup.process_recordings(metadata_to_fetch)
 
     def lookup_recordings(
         self, recordings: List["dict"]
@@ -353,10 +355,9 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         # Delete ids that were not found. Do this in chunks of 500
         with db.atomic():
             for chunk in range(0, len(missing_ids), 500):
-                DBRecording.delete(
-                    DBRecording.file_id.in_(missing_ids[chunk : chunk + 500])
-                    & DBRecording.file_id_type
-                    == FileIdType.SUBSONIC_ID
+                DBRecording.delete().where(
+                    DBRecording.file_id.in_(missing_ids[chunk : chunk + 500]),
+                    DBRecording.file_id_type == FileIdType.SUBSONIC_ID,
                 )
 
             # Remove all artists that no longer have any associated recordings
