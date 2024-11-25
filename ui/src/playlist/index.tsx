@@ -248,7 +248,10 @@ const Playlist = () => {
             prompt: data.prompt,
           });
 
-          notify.success({ message: "Successfully saved prompt as a session" });
+          notify.success({
+            message: "Successfully saved prompt as a session",
+            placement: "top",
+          });
         }
 
         setLoading(false);

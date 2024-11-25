@@ -104,10 +104,6 @@ type FormData =
   | Omit<PlaylistWithName, "recordings">
   | Omit<PlaylistWithId, "recordings">;
 
-interface PlaylistDataState extends Playlist {
-  id?: string;
-}
-
 interface PlaylistDataProps extends Omit<PlaylistState, "prompt"> {
   retryLoading: boolean;
   retry: (excludedMbids: string[]) => Promise<void>;
@@ -129,7 +125,7 @@ export const PlaylistData = ({
   const notify = useNotifyContext();
   const { playlists, setPlaylists } = useTagContext();
   const [form] = useForm<FormData>();
-  const [data, setData] = useState<PlaylistDataState>(playlist);
+  const [data, setData] = useState<Playlist>(playlist);
   const [loading, setLoading] = useState(false);
 
   const existing = Form.useWatch("existing", form);
@@ -293,19 +289,27 @@ export const PlaylistData = ({
             );
 
             setPlaylists((existing) =>
-              existing.map((playlist) =>
-                playlist.id === formData.id
-                  ? {
-                      name: playlist.name,
-                      id: playlist.id,
-                      songs: data.recordings.length,
-                      duration,
-                    }
-                  : playlist
-              )
+              existing.map((pls) => {
+                if (pls.id === formData.id) {
+                  const newPlaylist = {
+                    name: pls.name,
+                    id: pls.id,
+                    songs: data.recordings.length,
+                    duration,
+                  };
+
+                  updatePlaylist({
+                    ...newPlaylist,
+                    recordings: playlist.recordings,
+                  });
+                  return newPlaylist;
+                } else {
+                  return pls;
+                }
+              })
             );
           } else {
-            // updatePlaylist(playlist);
+            updatePlaylist({ ...playlist, id: resp.id });
           }
         }
       } catch (error) {
@@ -318,7 +322,14 @@ export const PlaylistData = ({
         setLoading(false);
       }
     },
-    [data.recordings, makeRequest, notify, setPlaylists, updatePlaylist]
+    [
+      data.recordings,
+      makeRequest,
+      notify,
+      playlist,
+      setPlaylists,
+      updatePlaylist,
+    ]
   );
 
   const doRetry = useCallback(async () => {

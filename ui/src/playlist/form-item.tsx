@@ -1,6 +1,5 @@
 import { Col, Select, Form, InputNumber, Checkbox } from "antd";
 import { DefaultOptionType } from "antd/es/select";
-import { useState } from "react";
 import { useTagContext } from "../contexts";
 import {
   FormArtistData,
@@ -10,7 +9,7 @@ import {
   GenreMode,
 } from "./types";
 
-const { Item } = Form;
+const { Item, useFormInstance, useWatch } = Form;
 
 export interface FormItemProps {
   advanced: boolean;
@@ -34,8 +33,9 @@ const GENRE_MODES: DefaultOptionType[] = [
 ];
 
 export const FormItem = ({ advanced, name }: FormItemProps) => {
+  const form = useFormInstance();
   const tags = useTagContext();
-  const [type, setType] = useState<FormItemType>();
+  const type = useWatch(["rules", name, "type"], form);
 
   return (
     <>
@@ -48,7 +48,6 @@ export const FormItem = ({ advanced, name }: FormItemProps) => {
             options={items}
             placeholder="Select a rule"
             showSearch
-            onChange={setType}
           />
         </Item>
       </Col>

@@ -97,6 +97,7 @@ export interface Recording {
 }
 
 export interface Playlist {
+  id?: string;
   name: string;
   recordings: Recording[];
   session?: number | null;

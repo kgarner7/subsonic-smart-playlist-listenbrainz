@@ -43,8 +43,9 @@ export const SessionForm = ({ sessions }: SessionFormProps) => {
 
       setSessions((sessions) => sessions.filter((sess) => sess.id !== session));
     }
+    form.resetFields(["session"]);
     setLoading(false);
-  }, [makeRequest, notify, session, setSessions]);
+  }, [form, makeRequest, notify, session, setSessions]);
 
   return (
     <Row className="potato" gutter={16}>
