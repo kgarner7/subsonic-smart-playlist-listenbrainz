@@ -4,12 +4,7 @@ load_dotenv()
 
 from os import environ
 
-from subsonic.database import (
-    ArtistSubsonicDatabase,
-    delete_session,
-    get_metadata,
-    get_sessions,
-)
+from subsonic.database import ArtistSubsonicDatabase
 from subsonic.process import MetadataHandler
 
 CACHE_TYPE = environ.get("CACHE_TYPE", "filesystem")
@@ -20,16 +15,21 @@ SESSION_COOKIE_SAMESITE = "Strict"
 
 
 def create_app():
-    from functools import wraps
-    from json import dumps, loads
+    from json import loads
     from subprocess import run
 
-    from subsonic.custom_connection import CustomConnection
-    import subsonic.schema as s
-
-    from flask import Flask, Response, render_template, request, session
+    from flask import Flask, Response, render_template, session
     from flask_session import Session
     from marshmallow import ValidationError
+
+    from subsonic.api import create_session, delete_session, get_metadata, get_sessions
+    from subsonic.custom_connection import CustomConnection
+    from subsonic.middleware import (
+        get_database,
+        login_or_credentials_required,
+        validate_schema,
+    )
+    import subsonic.schema as s
 
     app = Flask(
         __name__, static_folder="ui/dist", static_url_path="", template_folder="ui/dist"
@@ -52,62 +52,14 @@ def create_app():
     app.config.from_object(__name__)
     Session(app)
 
-    def login_or_credentials_required(func):
-        @wraps(func)
-        def is_authorized(*args, **kwargs):
-            if "credentials" in session:
-                return func(session["credentials"], *args, **kwargs)
-
-            user = request.args.get("u")
-
-            if user is None:
-                return {"error": "not authenticated"}, 401
-
-            token = request.args.get("t")
-            salt = request.args.get("s")
-
-            if token and salt:
-                credentials = {"u": user, "s": salt, "t": token}
-            else:
-                password = request.args.get("p")
-                if password is None:
-                    return {"error": "not authenticated"}, 401
-                credentials = {"u": user, "p": password}
-
-            conn = CustomConnection(credentials=credentials)
-            try:
-                ok = conn.ping()
-                if ok:
-                    return func(*args, **kwargs, credentials=credentials)
-            except BaseException as e:
-                print(e)
-                return {"error": str(e)}, 401
-
-            return {"error": "not authenticated"}, 401
-
-        return is_authorized
-
-    def validate_schema(schema: "s.Schema"):
-        def decorator(func):
-            @wraps(func)
-            def validate(*args, **kwargs):
-                json = schema().load(request.json)
-                return func(*args, **kwargs, json=json)
-
-            return validate
-
-        return decorator
-
     @app.get("/")
     def index():
         return render_template("index.html", authenticated="credentials" in session)
 
     @app.post("/api/login")
     @validate_schema(s.Login)
-    def login(json: dict):
-        connection = CustomConnection(
-            username=json["username"], password=json["password"]
-        )
+    def login(json: "s.Login"):
+        connection = CustomConnection(username=json.username, password=json.password)
         try:
             ok = connection.ping()
             if ok:
@@ -122,8 +74,8 @@ def create_app():
     @app.post("/api/scan")
     @login_or_credentials_required
     @validate_schema(s.Scan)
-    def start_scan(_, json: "dict"):
-        started = handler.submit_scan(json["full"])
+    def start_scan(_, json: "s.Scan"):
+        started = handler.submit_scan(json.full)
         return {"started": started}
 
     @app.get("/api/scanStatus")
@@ -149,22 +101,33 @@ def create_app():
 
     @app.get("/api/session")
     @login_or_credentials_required
+    @get_database
     def sessions(credentials):
         return get_sessions(credentials["u"]), 200
 
     @app.get("/api/tags")
     @login_or_credentials_required
+    @get_database
     def tags(_):
         return get_metadata(), 200
 
     @app.post("/api/radio")
     @login_or_credentials_required
     @validate_schema(s.CreateRadio)
-    def radio(credentials, json):
+    def radio(credentials, json: "s.CreateRadio"):
+        data = s.CreateRadioWithCredentials.Schema().dumps(
+            {
+                "credentials": credentials,
+                "excluded_mbids": json.excluded_mbids,
+                "prompt": json.prompt,
+                "quiet": json.quiet or False,
+            }
+        )
+
         output = run(
             ["python3", "get_radio.py"],
             capture_output=True,
-            input=dumps({"credentials": credentials, "prompt": json["prompt"]}),
+            input=data,
             text=True,
         )
 
@@ -178,7 +141,7 @@ def create_app():
                 print(output.stderr)
                 return {"error": "could not find recordings to make a playlist"}, 400
 
-            return [data, output.stderr]
+            return {"log": output.stderr, "playlist": data}
 
     @app.get("/api/proxy/<id>")
     @login_or_credentials_required
@@ -194,20 +157,28 @@ def create_app():
     @app.post("/api/createPlaylist")
     @login_or_credentials_required
     @validate_schema(s.CreatePlaylist)
-    def create_playlist(credentials, json: "dict"):
+    def create_playlist(credentials, json: s.CreatePlaylist):
         conn = CustomConnection(credentials=credentials)
-        if "id" in json == "name" in json:
+
+        if (json.name is None) == (json.id is None):
             return {"error": "You must provide EITHER playlist name OR id"}, 400
 
-        resp = conn.createPlaylist(
-            name=json.get("name"), playlistId=json.get("id"), songIds=json["ids"]
-        )
+        resp = conn.createPlaylist(name=json.name, playlistId=json.id, songIds=json.ids)
 
         return {"id": resp["playlist"]["id"]}, 200
 
-    @app.delete("/api/deleteSession/<int:id>")
+    @app.post("/api/session")
     @login_or_credentials_required
-    def destroy_session(credentials, id):
+    @validate_schema(s.CreateSession)
+    @get_database
+    def do_create_session(credentials, json: "s.CreateSession"):
+        session_id = create_session(credentials["u"], json)
+        return {"id": session_id}
+
+    @app.delete("/api/session/<int:id>")
+    @login_or_credentials_required
+    @get_database
+    def do_delete_session(credentials, id):
         try:
             delete_session(credentials["u"], id)
             return {}, 200

@@ -84,7 +84,7 @@ export const PromptForm = () => {
             </Row>
           </Item>
         </Col>
-        <Col xl={8} lg={12} xs={24}>
+        <Col lg={12} xs={24}>
           <Item label="Sort genres by">
             <Row>
               <Col span={12}>
@@ -114,23 +114,18 @@ export const PromptForm = () => {
             </Row>
           </Item>
         </Col>
-        <Col lg={8} xs={24}>
+        <Col lg={12} xs={24}>
           <Item name="mode" label="Difficulty" rules={[{ required: true }]}>
             <Select options={DifficultyOption} />
           </Item>
         </Col>
-        <Col lg={8} xs={12}>
+        <Col lg={12} xs={24}>
           <Item
             name="advanced"
             label="Show advanced filters"
             initialValue={advanced}
           >
             <Switch value={advanced} onChange={doSetAdvanced} />
-          </Item>
-        </Col>
-        <Col lg={8} xs={12}>
-          <Item name="session" label="Save this prompt" initialValue={false}>
-            <Switch defaultChecked={false} />
           </Item>
         </Col>
       </Row>

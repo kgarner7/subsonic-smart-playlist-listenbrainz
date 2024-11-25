@@ -1,38 +1,24 @@
-from typing import Any, Mapping
+from typing import ClassVar, Dict, List, Literal, Optional, Type, Union
 
 from enum import Enum as PyEnum
 
-from marshmallow import ValidationError, Schema
-from marshmallow.fields import (
-    Boolean,
-    Constant,
-    Dict,
-    Enum,
-    Field,
-    Integer,
-    List,
-    String,
-)
-from marshmallow.utils import EXCLUDE
+from dataclasses import dataclass, field
+from marshmallow_dataclass import dataclass
+from marshmallow import Schema
 from marshmallow.validate import Length
 
 
-class IntOrString(Field):
-    def _deserialize(
-        self, value: Any, attr: str | None, data: Mapping[str, Any] | None, **kwargs
-    ):
-        if isinstance(value, str):
-            return value
-        elif isinstance(value, int):
-            return str(value)
-        else:
-            raise ValidationError("Must be either a string or int")
+class base_schema:
+    Schema: ClassVar[Type["Schema"]] = Schema
 
 
-class CreatePlaylist(Schema):
-    name = String()
-    id = String()
-    ids = List(IntOrString, required=True, validate=Length(min=1))
+@dataclass
+class CreatePlaylist(base_schema):
+    id: Optional[Union[str, int]]
+    ids: List[Union[str, int]] = field(
+        metadata={"required": True, "validate": Length(1)},
+    )
+    name: Optional[str]
 
 
 class Mode(str, PyEnum):
@@ -46,48 +32,50 @@ class PromptType(str, PyEnum):
     SESSION = "session"
 
 
-class Prompt(Schema):
-    mode = Enum(Mode, by_value=True, required=True)
-    prompt = String(required=True)
-    session = Boolean(truthy=set(), falsy=set())
-    type = Constant(PromptType.PROMPT)
+@dataclass
+class TextRadio(base_schema):
+    type: Literal[PromptType.PROMPT]
+    prompt: str
+    mode: Mode = field(metadata={"by_value": True})
 
 
-class Session(Schema):
-    id = Integer(required=True)
-    type = Constant(PromptType.SESSION)
+@dataclass
+class SessionRadio(base_schema):
+    type: Literal[PromptType.SESSION]
+    id: int
 
 
-class PromptOrSession(Field):
-    def _deserialize(
-        self, value: Any, attr: str | None, data: Mapping[str, Any] | None, **kwargs
-    ):
-        if not isinstance(value, dict):
-            raise ValidationError("Must be a dictionary")
-
-        type = value.get("type")
-        if type == PromptType.PROMPT.value:
-            return Prompt().load(value, unknown=EXCLUDE)
-        elif type == PromptType.SESSION.value:
-            return Session().load(value, unknown=EXCLUDE)
-        else:
-            raise ValidationError("Prompt type must be either 'prompt' or 'session'")
+@dataclass
+class CreateRadio(base_schema):
+    prompt: Union[TextRadio, SessionRadio]
+    excluded_mbids: Optional[List[Union[str, int]]]
+    quiet: Optional[bool]
 
 
-class CreateRadio(Schema):
-    prompt = PromptOrSession(required=True)
+@dataclass
+class CreateRadioWithCredentials(base_schema):
+    credentials: Dict[str, str]
+    excluded_mbids: Optional[List[Union[str, int]]]
+    prompt: Union[TextRadio, SessionRadio]
+    quiet: Optional[bool]
 
 
-class CreateRadioWithCredentials(Schema):
-    credentials = Dict(String(), String(), required=True)
-    prompt = PromptOrSession(required=True)
-    quiet = Boolean(truthy=set(), falsy=set())
+@dataclass
+class Login(base_schema):
+    username: str
+    password: str
 
 
-class Login(Schema):
-    username = String(required=True)
-    password = String(required=True)
+@dataclass
+class Scan(base_schema):
+    full: bool
 
 
-class Scan(Schema):
-    full = Boolean(truthy=set(), falsy=set())
+@dataclass
+class CreateSession:
+    mbids: List[Union[str, int]] = field(
+        metadata={"required": True, "validate": Length(1)},
+    )
+    mode: Mode = field(metadata={"by_value": True})
+    name: str
+    prompt: str

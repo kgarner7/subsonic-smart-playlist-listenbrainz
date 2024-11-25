@@ -20,6 +20,7 @@ import {
   SortDirection,
   SortInfo,
   SortType,
+  Tag,
   Tags,
 } from "./types";
 import { sortFunc, SCAN_INTERVAL_MS, getBool, isScanning } from "./util";
@@ -44,6 +45,10 @@ const getDarkPreferred = () => {
 
 const getPreferredTextMode = () => {
   return getBool("text") ?? false;
+};
+
+const pluralizeRecording = (tag: Tag): string => {
+  return `(${tag.count} ${tag.count === 1 ? "recording" : "recordings"})`;
 };
 
 const App = () => {
@@ -212,7 +217,7 @@ const App = () => {
         }))
         .sort(func)
         .map((item) => ({
-          label: item.name,
+          label: `${item.name} ${pluralizeRecording(item)}`,
           value: item.mbid,
         }));
     }
@@ -225,7 +230,7 @@ const App = () => {
       const func = sortFunc(tagSort);
 
       return artistTags.tags.sort(func).map((item) => ({
-        label: item.name,
+        label: `${item.name} ${pluralizeRecording(item)})`,
         value: item.name,
       }));
     }

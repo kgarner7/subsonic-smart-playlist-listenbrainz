@@ -1,6 +1,5 @@
 from typing import Dict, List, NotRequired, Optional, TypedDict
 
-from datetime import datetime
 from os import environ
 
 from json import loads, dumps
@@ -114,68 +113,55 @@ if __name__ == "__main__":
     from sys import stdin
 
     data = loads(stdin.readline())
-    json = CreateRadioWithCredentials().load(data)
+    json: "CreateRadioWithCredentials" = CreateRadioWithCredentials.Schema().load(data)
 
-    credentials = json["credentials"]
-    prompt = json["prompt"]
+    prompt = json.prompt
 
     setup_db(DATABASE_PATH)
     db.connect()
 
-    is_session = prompt["type"] == PromptType.SESSION.value
-
-    if is_session:
+    if prompt.type == PromptType.SESSION:
         try:
             session: "Session" = (
                 Session.select(Session.mode, Session.prompt, Session.seen)
-                .where(Session.username == credentials["u"], Session.id == prompt["id"])
+                .where(
+                    Session.username == json.credentials["u"],
+                    Session.id == prompt.id,
+                )
                 .get()
             )
-            create_session = False
 
             mode = session.mode
             text = session.prompt
             if session.seen:
                 excluded_mbids.update(session.seen)
         except DoesNotExist:
-            raise Exception(f"No session with id {prompt["id"]}")
+            raise Exception(f"No session with id {prompt.id}")
     else:
-        mode = prompt["mode"].value
-        text = prompt["prompt"]
-        create_session = prompt.get("session", False)
+        mode = prompt.mode.value
+        text = prompt.prompt
 
-    results = get_radio(mode, text, credentials, json.get("quiet", False))
+    if json.excluded_mbids:
+        excluded_mbids.update(json.excluded_mbids)
+
+    results = get_radio(mode, text, json.credentials, json.quiet or False)
 
     if results is None:
-        if is_session:
-            Session.delete_by_id(prompt["id"])
+        if prompt.type == PromptType.SESSION:
+            Session.delete_by_id(prompt.id)
             raise Exception("This session has exhausted all available songs")
 
         raise Exception("Could not find any tracks to create a playlist")
 
-    if create_session:
+    if prompt.type == PromptType.SESSION:
         if len(results["recordings"]) < 50:
-            results["session"] = None
-        else:
-            seen_ids = [r["mbid"] for r in results["recordings"]]
-            id = Session.insert(
-                username=credentials["u"],
-                name=results["name"],
-                prompt=text,
-                mode=mode,
-                seen=seen_ids,
-                last_updated=datetime.now(),
-            ).execute()
-            results["session"] = id
-    elif is_session:
-        if len(results["recordings"]) < 50:
-            Session.delete_by_id(prompt["id"]).execute()
+            Session.delete_by_id(prompt.id).execute()
             results["session"] = None
         else:
             seen_ids = [r["mbid"] for r in results["recordings"]]
             Session.update(seen=Session.seen.set(session.seen + seen_ids)).where(
-                Session.id == prompt["id"]
+                Session.id == prompt.id
             ).execute()
-            results["session"] = prompt["id"]
+            results["session"] = prompt.id
 
     print(dumps(results), end="")

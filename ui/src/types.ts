@@ -66,25 +66,6 @@ export interface TagInfo {
   tags: DefaultOptionType[];
 }
 
-export interface Recording {
-  artists?: Array<{ mbid: string; name: string }>;
-  durationMs: number;
-  id: string;
-  mbid: string;
-  release?: { mbid: string; name: string };
-  title: string;
-  url: string;
-  year: number;
-}
-
-export interface Playlist {
-  name: string;
-  recordings: Recording[];
-  session?: number | null;
-}
-
-export type PlaylistResponse = [Playlist, string];
-
 export interface Session {
   id: number;
   name: string;

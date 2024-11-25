@@ -39,7 +39,6 @@ export type FormRowData = FormArtistData | FormGenreData;
 export interface Prompt {
   mode: Difficulty;
   prompt: string;
-  session?: boolean;
   type: PromptType.PROMPT;
 }
 
@@ -49,6 +48,7 @@ export interface Session {
 }
 
 export interface RadioCreate {
+  excluded_mbids: string[]
   prompt: Prompt | Session;
 }
 
@@ -61,11 +61,10 @@ export interface PromptData {
   advanced?: boolean;
   mode: Difficulty;
   rules: FormRowData[];
-  session?: boolean;
   type: PromptType.PROMPT;
 }
 
-export type FormData = PromptData | SessionData;
+export type FormData = PromptData | SessionData ;
 
 export interface ExistingPlaylist {
   duration: number;
@@ -85,3 +84,29 @@ export interface UpdatePlaylistById {
 }
 
 export type CreatePlaylist = CreatePlaylistFromName | UpdatePlaylistById;
+
+export interface Recording {
+  artists?: Array<{ mbid: string; name: string }>;
+  durationMs: number;
+  id: string;
+  mbid: string;
+  release?: { mbid: string; name: string };
+  title: string;
+  url: string;
+  year: number;
+}
+
+export interface Playlist {
+  name: string;
+  recordings: Recording[];
+  session?: number | null;
+}
+
+export type PlaylistResponse = {
+  log: string;
+  playlist: Playlist;
+}
+
+export interface PlaylistState extends PlaylistResponse {
+  prompt: RadioCreate;
+}

@@ -1,15 +1,14 @@
 from typing import Dict, List, Set, Tuple
 
 from datetime import datetime
-from os import environ
 
 from subsonic.artist import Artist as DBArtist, RecordingArtist
 from subsonic.database import ArtistSubsonicDatabase
-from subsonic.patched.patch import BatchedLookupWithExclude
 
 from troi import Artist, ArtistCredit, Recording, Release
 from troi.content_resolver.database import db
 from troi.content_resolver.metadata_lookup import MetadataLookup, RecordingRow
+from troi.musicbrainz.recording_lookup import RecordingLookupElement
 from troi.content_resolver.model.recording import Recording as DBRecording, FileIdType
 
 
@@ -24,7 +23,7 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
 
         # Lookups
         self.metadata_lookup = MetadataLookup(True)
-        self.recording_lookup = BatchedLookupWithExclude()
+        self.recording_lookup = RecordingLookupElement()
 
         # Store existing ids
         self.existing_artists: Set[str] = set()

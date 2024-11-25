@@ -1,10 +1,9 @@
 import { Button, Collapse, Form, Select, Typography } from "antd";
 import type { DefaultOptionType } from "antd/es/select";
-import { useCallback, useEffect, useState } from "react";
-import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
-import { PlaylistResponse } from "../types";
+import { useEffect } from "react";
+import { useTagContext } from "../contexts";
 import { PromptForm } from "./prompt-form";
-import { FormData, FormItemType, PromptType, RadioCreate } from "./types";
+import { FormData, PromptType } from "./types";
 import { SessionForm } from "./session-form";
 
 const { Item } = Form;
@@ -16,15 +15,14 @@ const PromptOptions: DefaultOptionType[] = [
 ];
 
 export interface PlaylistFormProps {
-  onSuccess: (playlist: PlaylistResponse) => void;
+  loading: boolean;
+
+  submit: (data: FormData) => Promise<void>;
 }
 
-const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
-  const { sessions, setSessions } = useTagContext();
-  const notify = useNotifyContext();
-  const { makeRequest } = useAppContext();
+const PlaylistForm = ({ loading, submit }: PlaylistFormProps) => {
+  const { sessions } = useTagContext();
 
-  const [loading, setLoading] = useState(false);
   const [form] = Form.useForm<FormData>();
   const type = Form.useWatch("type", form);
 
@@ -33,139 +31,6 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
       form.setFieldValue("type", PromptType.PROMPT);
     }
   }, [form, sessions.length]);
-
-  const submit = useCallback(
-    async (data: FormData) => {
-      setLoading(true);
-
-      try {
-        let body: RadioCreate;
-
-        if (data.type === PromptType.PROMPT) {
-          const { advanced, mode, rules, session } = data;
-
-          let prompt: string;
-
-          if (advanced) {
-            prompt = rules
-              .map((rule) => {
-                const weight = rule.weight ?? 1;
-
-                if (rule.type === FormItemType.ARTIST) {
-                  const nosim = rule.similar === false ? ":nosim" : "";
-                  return `artist:(${rule.artist}):${weight}${nosim}`;
-                } else {
-                  const nosim = rule.similar === false ? "nosim," : "";
-                  return `tag:(${rule.genre.join(",")}):${weight}:${nosim}${
-                    rule.join
-                  }`;
-                }
-              })
-              .join(" ");
-          } else {
-            prompt = rules
-              .map((rule) => {
-                if (rule.type === FormItemType.ARTIST) {
-                  return `artist:(${rule.artist})`;
-                } else {
-                  return `tag:(${rule.genre.join(",")})`;
-                }
-              })
-              .join(" ");
-          }
-
-          body = {
-            prompt: { type: PromptType.PROMPT, mode, prompt, session },
-          };
-        } else {
-          body = { prompt: { type: PromptType.SESSION, id: data.session } };
-        }
-
-        const response = await makeRequest<PlaylistResponse>(
-          "radio",
-          "POST",
-          body,
-          (error) => {
-            if (data.type === PromptType.SESSION) {
-              setSessions((sesss) =>
-                sesss.filter((sess) => sess.id !== data.session)
-              );
-
-              notify.error({
-                message: "This session has finished",
-                description:
-                  "All possible tracks have been excluded, no more songs to fetch. Deleting this session",
-                placement: "top",
-              });
-            } else {
-              notify.error({
-                message: "Failed to generate playlist",
-                description: error.error,
-                placement: "top",
-              });
-            }
-          }
-        );
-
-        if (response !== null) {
-          if (data.type === PromptType.PROMPT && data.session) {
-            if (response[0].session) {
-              setSessions((sessions) =>
-                sessions.concat([
-                  {
-                    name: response[0].name,
-                    id: response[0].session!,
-                    seen: 50,
-                  },
-                ])
-              );
-
-              notify.success({
-                message: "Playlist successfully generated",
-                description: response[0].name,
-                placement: "top",
-              });
-            } else {
-              notify.warning({
-                message: "Playlist successfully generated",
-                description: `New playlist ${response[0].name}. However, as there are fewer than 50 tracks, a radio session was not created`,
-                placement: "top",
-              });
-            }
-          } else {
-            setSessions((sessions) =>
-              sessions.map((session) =>
-                session.id === data.session
-                  ? {
-                      id: session.id,
-                      name: session.name,
-                      seen: (session.seen += response[0].recordings.length),
-                    }
-                  : session
-              )
-            );
-
-            notify.success({
-              message: "Successfully fetched",
-              description: response[0].name,
-              placement: "top",
-            });
-          }
-
-          onSuccess(response);
-        }
-      } catch (error) {
-        notify.error({
-          message: "Failed to generate playlist",
-          description: (error as Error).message,
-          placement: "top",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [makeRequest, notify, onSuccess, setSessions]
-  );
 
   return (
     <Form<FormData>
@@ -230,14 +95,20 @@ const PlaylistForm = ({ onSuccess }: PlaylistFormProps) => {
                       </ol>
                     </li>
                     <li>
-                      Optionally, choose to save this prompt as a session. This
-                      will allow you to continually retrieve new items until all
-                      songs have been fetcehd
+                      Generate the playlist. After a few seconds, you will have
+                      a playlist you can edit.
                     </li>
                     <li>
-                      Generate the playlist. After a few seconds, you will have
-                      a playlist you can edit. Once you're happy, press save and
-                      it will be saved to your server
+                      You can also retry, excluding currently selected tracks.
+                      This will create a new playlist, excluding tracks
+                      previously seen, if possible.
+                    </li>
+                    <li>
+                      Once you're happy, press save and it will be saved to your
+                      server. Here, you can also choose to save the prompt as a
+                      session to return to it later. Note that if you did
+                      multiple retries, this will start with excluding those
+                      tracks
                     </li>
                   </ol>
                   Note, if you have an existing session, you can instead use to

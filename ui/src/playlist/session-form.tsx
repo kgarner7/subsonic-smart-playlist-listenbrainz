@@ -32,7 +32,7 @@ export const SessionForm = ({ sessions }: SessionFormProps) => {
   const deleteSession = useCallback(async () => {
     setLoading(true);
     const response = await makeRequest<Record<string, never>>(
-      `deleteSession/${session}`,
+      `session/${session}`,
       "DELETE"
     );
     if (response !== null) {

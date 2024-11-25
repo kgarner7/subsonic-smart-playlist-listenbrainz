@@ -57,12 +57,11 @@ h1 {
   width: 100%;
 }
 
-.sortable tr {
-  cursor: default !important;
+.sortable .ant-table-cell {
+  cursor: move;
 }
 
 .ant-table-cell {
-  cursor: move;
   max-width: calc(33vw);
 }
 

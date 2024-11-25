@@ -1,10 +1,17 @@
 import {
+  CloudUploadOutlined,
+  DeleteOutlined,
+  RedoOutlined,
+  UndoOutlined,
+} from "@ant-design/icons";
+import {
   DndContext,
   DragEndEvent,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
@@ -12,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { strip } from "ansicolor";
 import {
   Button,
   Col,
@@ -24,7 +32,7 @@ import {
   Table,
   TableColumnsType,
 } from "antd";
-import { strip } from "ansicolor";
+import { DefaultOptionType } from "antd/es/select";
 import {
   HTMLAttributes,
   useCallback,
@@ -32,12 +40,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Playlist, Recording } from "../types";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { useAppContext, useNotifyContext, useTagContext } from "../contexts";
-import { DeleteOutlined } from "@ant-design/icons";
-import { CreatePlaylist } from "./types";
-import { DefaultOptionType } from "antd/es/select";
+import { CreatePlaylist, Playlist, PlaylistState, Recording } from "./types";
 
 const { Item, useForm } = Form;
 
@@ -100,24 +104,50 @@ type FormData =
   | Omit<PlaylistWithName, "recordings">
   | Omit<PlaylistWithId, "recordings">;
 
-interface PlaylistState extends Playlist {
+interface PlaylistDataState extends Playlist {
   id?: string;
 }
 
-export interface PlaylistDataProps {
-  playlist: Playlist;
-  log: string;
+interface PlaylistDataProps extends Omit<PlaylistState, "prompt"> {
+  retryLoading: boolean;
+  retry: (excludedMbids: string[]) => Promise<void>;
+  saveAsSession: () => void;
+  updatePlaylist: (playlist: Playlist) => void;
 }
 
-export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
+const REMAINING_REGEX = /HatedRecordingsFilterElement\s+(\d+)/;
+
+export const PlaylistData = ({
+  log,
+  playlist,
+  retryLoading,
+  retry,
+  saveAsSession,
+  updatePlaylist,
+}: PlaylistDataProps) => {
   const { showText, makeRequest } = useAppContext();
   const notify = useNotifyContext();
   const { playlists, setPlaylists } = useTagContext();
   const [form] = useForm<FormData>();
-  const [data, setData] = useState<PlaylistState>(playlist);
+  const [data, setData] = useState<PlaylistDataState>(playlist);
   const [loading, setLoading] = useState(false);
 
   const existing = Form.useWatch("existing", form);
+  const existingId = Form.useWatch("id", form);
+
+  const canRetry = useMemo(() => {
+    if (playlist.session) return false;
+
+    const match = REMAINING_REGEX.exec(log);
+    if (match) {
+      const count = parseInt(match[1], 10);
+      return count > 50;
+    } else {
+      console.error(`No HatedRecording match for ${log}`);
+    }
+
+    return false;
+  }, [log, playlist.session]);
 
   const reset = useCallback(() => {
     setData(playlist);
@@ -274,6 +304,8 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
                   : playlist
               )
             );
+          } else {
+            // updatePlaylist(playlist);
           }
         }
       } catch (error) {
@@ -286,8 +318,13 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
         setLoading(false);
       }
     },
-    [data.recordings, makeRequest, notify, setPlaylists]
+    [data.recordings, makeRequest, notify, setPlaylists, updatePlaylist]
   );
+
+  const doRetry = useCallback(async () => {
+    const excludes = playlist.recordings.map((r) => r.mbid);
+    await retry(excludes);
+  }, [playlist, retry]);
 
   return (
     <Form form={form} onFinish={submit}>
@@ -306,6 +343,18 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
         <>
           <Item label="Your playlist name">{data.name}</Item>
           <Item label="Your playlist ID">{data.id}</Item>
+          {canRetry && (
+            <Item>
+              <Button
+                block
+                type="primary"
+                loading={loading}
+                onClick={saveAsSession}
+              >
+                Save as session
+              </Button>
+            </Item>
+          )}
         </>
       )}
 
@@ -337,20 +386,36 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
             </Item>
           )}
           <Row gutter={16}>
-            <Col span={12}>
+            <Col flex="auto">
               <Item>
-                <Button block onClick={reset}>
-                  Reset
+                <Button block onClick={reset} icon={<UndoOutlined />}>
+                  Undo changes to selected tracks
                 </Button>
               </Item>
             </Col>
-            <Col span={12}>
+            {playlist.recordings.length === 50 && (
+              <Col flex="auto">
+                <Item>
+                  <Button
+                    block
+                    onClick={doRetry}
+                    loading={loading || retryLoading}
+                    icon={<RedoOutlined />}
+                  >
+                    Retry, excluding current tracks
+                  </Button>
+                </Item>
+              </Col>
+            )}
+            <Col flex="auto">
               <Item>
                 <Button
                   type="primary"
                   htmlType="submit"
                   block
-                  loading={loading}
+                  loading={loading || retryLoading}
+                  icon={<CloudUploadOutlined />}
+                  disabled={existing && !existingId}
                 >
                   {existing ? "Update" : "Create"} Playlist
                 </Button>
@@ -369,7 +434,7 @@ export const PlaylistData = ({ playlist, log }: PlaylistDataProps) => {
           strategy={verticalListSortingStrategy}
           disabled={!!data.id}
         >
-          <div className={data.id ? "sortable" : ""}>
+          <div className={data.id ? "" : "sortable"}>
             <Table<Recording>
               components={{ body: { row: RecordingRow } }}
               rowKey="id"
