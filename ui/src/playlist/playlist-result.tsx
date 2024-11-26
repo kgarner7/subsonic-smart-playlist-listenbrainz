@@ -111,7 +111,7 @@ interface PlaylistDataProps extends Omit<PlaylistState, "prompt"> {
   updatePlaylist: (playlist: Playlist) => void;
 }
 
-const REMAINING_REGEX = /HatedRecordingsFilterElement\s+(\d+)/;
+const REMAINING_REGEX = /HatedSubsonicRecordingsFilterElement\s+(\d+)/;
 
 export const PlaylistData = ({
   log,
