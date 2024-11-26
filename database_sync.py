@@ -157,9 +157,9 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                     # but DO NOT clear out the dict yet
                     self.seen_existing_ids.add(id)
 
-                if id in self.existing_subsonic_id_to_rating:
+                if id in self.existing_subsonic_id_to_mbid:
                     rating = song.get("userRating")
-                    existing_rating = self.existing_subsonic_id_to_rating[id]
+                    existing_rating = self.existing_subsonic_id_to_rating.get(id)
 
                     if rating != existing_rating:
                         rating_update.append((id, rating))
