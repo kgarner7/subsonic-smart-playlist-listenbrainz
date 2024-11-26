@@ -1,16 +1,16 @@
-from typing import TypedDict
+from typing import Dict, TypedDict
+from multiprocessing.sharedctypes import SynchronizedArray
+
+from concurrent.futures import ThreadPoolExecutor
+from json import dumps
+from multiprocessing import Array
+from os import environ
+from subprocess import PIPE, Popen
 
 
 class ScanState(TypedDict):
     fetched: int
     scanning: bool
-
-
-from multiprocessing.sharedctypes import SynchronizedArray
-
-from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import Array
-from subprocess import PIPE, Popen
 
 
 class MetadataHandler:
@@ -26,23 +26,25 @@ class MetadataHandler:
         with self.scanStatus.get_lock():
             return {"fetched": self.scanStatus[0], "scanning": bool(self.scanStatus[1])}
 
-    def submit_scan(self, full: bool) -> bool:
+    def submit_scan(self, full: bool, credentials: Dict[str, str]) -> bool:
         with self.scanStatus.get_lock():
             if self.scanStatus[1]:
                 return False
 
-            self.executor.submit(self.scan, full)
+            self.executor.submit(self.scan, full, credentials)
             self.scanStatus[0] = 0
             self.scanStatus[1] = 1
 
             return True
 
-    def scan(self, is_full: bool) -> None:
+    def scan(self, is_full: bool, credentials: Dict[str, str]) -> None:
         args = ["python3", "database_sync.py"]
         if is_full:
             args.append("--full")
 
-        process = Popen(args, stdout=PIPE, stderr=PIPE)
+        env = environ.copy()
+        env["SUBSONIC_CREDENTIALS"] = dumps(credentials)
+        process = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
 
         self.scanStatus[0] = 0
         self.scanStatus[1] = 1

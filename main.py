@@ -7,11 +7,7 @@ from os import environ
 from subsonic.database import ArtistSubsonicDatabase
 from subsonic.process import MetadataHandler
 
-CACHE_TYPE = environ.get("CACHE_TYPE", "filesystem")
-PERMANENT_SESSION_LIFETIME = int(environ.get("SESSION_DURATION_SEC", 86400))
 DEBUG = environ.get("MODE", "production") == "debug"
-
-SESSION_COOKIE_SAMESITE = "Strict"
 
 
 def create_app():
@@ -36,6 +32,9 @@ def create_app():
     )
     global CACHE_PATH, SESSION_CACHELIB, SESSION_REDIS, SESSION_TYPE
 
+    CACHE_TYPE = environ.get("CACHE_TYPE", "filesystem")
+    PERMANENT_SESSION_LIFETIME = int(environ.get("SESSION_DURATION_SEC", 86400))
+
     if CACHE_TYPE == "filesystem":
         from cachelib.file import FileSystemCache
 
@@ -48,6 +47,8 @@ def create_app():
 
         REDIS_URL = environ.get("REDIS_URL", "http://localhost:6379")
         SESSION_REDIS = Redis.from_url(REDIS_URL)
+
+    SESSION_COOKIE_SAMESITE = "Strict"
 
     app.config.from_object(__name__)
     Session(app)
@@ -74,8 +75,8 @@ def create_app():
     @app.post("/api/scan")
     @login_or_credentials_required
     @validate_schema(s.Scan)
-    def start_scan(_, json: "s.Scan"):
-        started = handler.submit_scan(json.full)
+    def start_scan(credentials, json: "s.Scan"):
+        started = handler.submit_scan(json.full, credentials)
         return {"started": started}
 
     @app.get("/api/scanStatus")
@@ -225,8 +226,9 @@ del database
 
 if __name__ == "__main__":
     if DEBUG:
+        PORT = environ.get("PORT", 5000)
         app = create_app()
-        app.run()
+        app.run(port=PORT)
     else:
         from gunicorn.app.base import Application
 

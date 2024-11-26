@@ -4,11 +4,9 @@ from troi.content_resolver.database import db
 from troi.content_resolver.subsonic import SubsonicDatabase
 
 from .artist import Artist, RecordingArtist
-from .custom_connection import CustomConnection
+from .rating import create_rating_table
 from .session import Session
 
-SUBSONIC_BACKEND_USER = environ["SUBSONIC_BACKEND_USER"]
-SUBSONIC_BACKEND_PASS = environ["SUBSONIC_BACKEND_PASS"]
 DATABASE_PATH = environ["DATABASE_PATH"]
 
 
@@ -23,8 +21,4 @@ class ArtistSubsonicDatabase(SubsonicDatabase):
         super().create()
         # Additional tables we want to keep track of resolved artists
         db.create_tables((Artist, RecordingArtist, Session))
-
-    def connect(self):
-        return CustomConnection(
-            username=SUBSONIC_BACKEND_USER, password=SUBSONIC_BACKEND_PASS
-        )
+        create_rating_table(db)

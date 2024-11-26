@@ -1,8 +1,11 @@
 from typing import Dict, List, Set, Tuple
 
 from datetime import datetime
+from json import loads
+from os import environ
 
 from subsonic.artist import Artist as DBArtist, RecordingArtist
+from subsonic.custom_connection import CustomConnection
 from subsonic.database import ArtistSubsonicDatabase
 
 from troi import Artist, ArtistCredit, Recording, Release
@@ -13,6 +16,22 @@ from troi.content_resolver.model.recording import Recording as DBRecording, File
 
 
 DuplicateRecordings = Dict[str, List[dict]]
+RatingId = Tuple[str, int | None]
+
+
+CREDENTIALS = loads(environ["SUBSONIC_CREDENTIALS"])
+
+
+DELETE_RATING_QUERY = """
+DELETE FROM rating WHERE recording_id = ? AND username = ?
+"""
+
+INSERT_RATING_QUERY = """
+INSERT INTO RATING (recording_id, recording_type, username, rating)
+VALUES(?, ?, ?, ?)
+ON CONFLICT(recording_id, recording_type, username)
+DO UPDATE SET rating=excluded.rating;
+"""
 
 
 class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
@@ -32,6 +51,7 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         )
         self.existing_mbid_subsonic_id_to_id: Dict[Tuple[str, str], int] = {}
         self.existing_subsonic_id_to_mbid: Dict[str, str] = {}
+        self.existing_subsonic_id_to_rating: Dict[str, int | None] = {}
         self.seen_existing_ids: Set[str] = set()
 
         super().__init__()
@@ -61,7 +81,7 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         This should significantly improve successive scans from the metadata
         lookup perspective.
         """
-        conn = self.connect()
+        conn = CustomConnection(credentials=CREDENTIALS)
         if not conn:
             return
 
@@ -119,6 +139,8 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
             )
 
             songs: "List[dict]" = results["searchResult3"]["song"]
+            rating_update: List[RatingId] = []
+
             for song in songs:
                 mbid = song.get("musicBrainzId")
                 id = song["id"]
@@ -134,6 +156,31 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                     # be duplicate tracks with the same MBID, mark it as being seen
                     # but DO NOT clear out the dict yet
                     self.seen_existing_ids.add(id)
+
+                if id in self.existing_subsonic_id_to_rating:
+                    rating = song.get("userRating")
+                    existing_rating = self.existing_subsonic_id_to_rating[id]
+
+                    if rating != existing_rating:
+                        rating_update.append((id, rating))
+
+            if rating_update:
+                with db.atomic():
+                    for id, rating in rating_update:
+                        if rating is None:
+                            db.execute_sql(
+                                DELETE_RATING_QUERY, params=(id, CREDENTIALS["u"])
+                            )
+                        else:
+                            db.execute_sql(
+                                INSERT_RATING_QUERY,
+                                params=(
+                                    id,
+                                    FileIdType.SUBSONIC_ID.value,
+                                    CREDENTIALS["u"],
+                                    rating,
+                                ),
+                            )
 
             song_count = len(songs)
             offset += song_count
@@ -161,15 +208,21 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
         Fetch existing data, to allow for fast sync in later steps.
         Specifically, fetches existing recordings and artists
         """
-        for recording in DBRecording.select(
-            DBRecording.id, DBRecording.file_id, DBRecording.recording_mbid
-        ).where(DBRecording.file_id_type == FileIdType.SUBSONIC_ID):
-            self.existing_subsonic_id_to_mbid[recording.file_id] = (
-                recording.recording_mbid
-            )
-            self.existing_mbid_subsonic_id_to_id[
-                (recording.file_id, recording.recording_mbid)
-            ] = recording.id
+
+        query = """
+SELECT id, file_id, recording_mbid, rating
+FROM recording
+LEFT JOIN rating
+ON rating.recording_id = recording.id
+WHERE username IS NULL or username == ?
+        """
+
+        cursor = db.execute_sql(query, params=[CREDENTIALS["u"]])
+        for id, file_id, mbid, rating in cursor.fetchall():
+            self.existing_subsonic_id_to_mbid[file_id] = mbid
+            if rating is not None:
+                self.existing_subsonic_id_to_rating[file_id] = rating
+            self.existing_mbid_subsonic_id_to_id[(file_id, mbid)] = id
 
         for artist in DBArtist.select(
             DBArtist.mbid, DBArtist.subsonic_name, DBArtist.subsonic_id
@@ -337,6 +390,18 @@ class ProcessLocalSubsonicDatabase(ArtistSubsonicDatabase):
                         ]
                         RecordingArtist.insert_many(artist_tags_to_insert).execute()
                         recording_id = new_recording.id
+
+                        rating = song.get("userRating")
+                        if rating:
+                            db.execute_sql(
+                                INSERT_RATING_QUERY,
+                                params=(
+                                    song["id"],
+                                    FileIdType.SUBSONIC_ID.value,
+                                    CREDENTIALS["u"],
+                                    rating,
+                                ),
+                            )
 
                     metadata_lookup_rows.append(
                         RecordingRow(recording_id, recording.mbid, recording_id)

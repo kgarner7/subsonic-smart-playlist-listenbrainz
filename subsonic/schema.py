@@ -2,7 +2,7 @@ from typing import ClassVar, Dict, List, Literal, Optional, Type, Union
 
 from enum import Enum as PyEnum
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from marshmallow_dataclass import dataclass
 from marshmallow import Schema
 from marshmallow.validate import Length
@@ -72,7 +72,7 @@ class Scan(base_schema):
 
 
 @dataclass
-class CreateSession:
+class CreateSession(base_schema):
     mbids: List[Union[str, int]] = field(
         metadata={"required": True, "validate": Length(1)},
     )
