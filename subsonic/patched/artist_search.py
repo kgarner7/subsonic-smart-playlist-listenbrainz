@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from troi.content_resolver import artist_search
 from troi.content_resolver.model.database import db
+from troi.content_resolver.model.recording import FileIdType
 from troi.content_resolver.utils import select_recordings_on_popularity
 
 __all__ = ["MultivaluedLocalRecordingSearchByArtistService"]
@@ -51,7 +52,6 @@ class MultivaluedLocalRecordingSearchByArtistService(
                         , recording_mbid
                         , artist_id
                         , file_id
-                        , file_id_type
                      FROM recording
                 LEFT JOIN recording_metadata
                        ON recording.id = recording_metadata.recording_id
@@ -67,14 +67,14 @@ class MultivaluedLocalRecordingSearchByArtistService(
         cursor = db.execute_sql(query % placeholders, params=artist_mbids)
 
         artists = defaultdict(list)
-        for rec in cursor.fetchall():
-            artists[rec[2]].append(
+        for popularity, recording_mbid, artist_mbid, file_id in cursor.fetchall():
+            artists[artist_mbid].append(
                 {
-                    "popularity": rec[0],
-                    "recording_mbid": rec[1],
-                    "artist_mbid": rec[2],
-                    "file_id": rec[3],
-                    "file_id_type": rec[4],
+                    "popularity": popularity,
+                    "recording_mbid": recording_mbid,
+                    "artist_mbid": artist_mbid,
+                    "file_id": file_id,
+                    "file_id_type": FileIdType.SUBSONIC_ID,
                 }
             )
 

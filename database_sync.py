@@ -420,8 +420,7 @@ WHERE username IS NULL or username == ?
         with db.atomic():
             for chunk in range(0, len(missing_ids), 500):
                 DBRecording.delete().where(
-                    DBRecording.file_id.in_(missing_ids[chunk : chunk + 500]),
-                    DBRecording.file_id_type == FileIdType.SUBSONIC_ID,
+                    DBRecording.file_id.in_(missing_ids[chunk : chunk + 500])
                 )
 
             # Remove all artists that no longer have any associated recordings
