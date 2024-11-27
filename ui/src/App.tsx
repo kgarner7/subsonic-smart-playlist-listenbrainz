@@ -17,13 +17,18 @@ import {
   isError,
   ScanStatus,
   Session,
-  SortDirection,
   SortInfo,
-  SortType,
   Tag,
   Tags,
 } from "./types";
-import { sortFunc, SCAN_INTERVAL_MS, getBool, isScanning } from "./util";
+import {
+  sortFunc,
+  SCAN_INTERVAL_MS,
+  getBool,
+  isScanning,
+  getSort,
+  SortKey,
+} from "./util";
 import { TagContext, TagContextProps } from "./contexts/tag-context";
 import { AppHeader } from "./header/app-header";
 import { ExistingPlaylist } from "./playlist/types";
@@ -64,15 +69,10 @@ const App = () => {
   const [playlists, setPlaylists] = useState<ExistingPlaylist[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  const [artistSort, setArtistSort] = useState<SortInfo>({
-    direction: SortDirection.ASCENDING,
-    type: SortType.NAME,
-  });
-
-  const [tagSort, setTagSort] = useState<SortInfo>({
-    direction: SortDirection.ASCENDING,
-    type: SortType.NAME,
-  });
+  const [artistSort, setArtistSort] = useState<SortInfo>(
+    getSort(SortKey.ARTIST)
+  );
+  const [tagSort, setTagSort] = useState<SortInfo>(getSort(SortKey.TAG));
 
   const scanRef = useRef<number>();
 
@@ -230,7 +230,7 @@ const App = () => {
       const func = sortFunc(tagSort);
 
       return artistTags.tags.sort(func).map((item) => ({
-        label: `${item.name} ${pluralizeRecording(item)})`,
+        label: `${item.name} ${pluralizeRecording(item)}`,
         value: item.name,
       }));
     }

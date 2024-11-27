@@ -5,8 +5,8 @@ import { useCallback, useState } from "react";
 
 import { useTagContext } from "../contexts";
 
-import { SortType, SortDirection } from "../types";
-import { getBool, setBool } from "../util";
+import { SortType, SortDirection, SortInfo } from "../types";
+import { getBool, setBool, setSort, SortKey } from "../util";
 
 import { FormItem } from "./form-item";
 import { Difficulty } from "./types";
@@ -50,6 +50,28 @@ export const PromptForm = () => {
     setBool("advanced", checked);
   }, []);
 
+  const doArtistSort = useCallback(
+    (data: Partial<SortInfo>) => {
+      setArtistSort((existing) => {
+        const final = { ...existing, ...data };
+        setSort(SortKey.ARTIST, final);
+        return final;
+      });
+    },
+    [setArtistSort]
+  );
+
+  const doTagSort = useCallback(
+    (data: Partial<SortInfo>) => {
+      setTagSort((existing) => {
+        const final = { ...existing, ...data };
+        setSort(SortKey.ARTIST, final);
+        return final;
+      });
+    },
+    [setTagSort]
+  );
+
   return (
     <>
       <Row gutter={[16, 10]}>
@@ -61,24 +83,14 @@ export const PromptForm = () => {
                 <Select
                   options={SORT_OPTIONS}
                   value={artistSort.type}
-                  onChange={(type) =>
-                    setArtistSort((existing) => ({
-                      ...existing,
-                      type,
-                    }))
-                  }
+                  onChange={(type) => doArtistSort({ type })}
                 />
               </Col>
               <Col span={12}>
                 <Select
                   options={SORT_DIRECTION}
                   value={artistSort.direction}
-                  onChange={(direction) =>
-                    setArtistSort((existing) => ({
-                      ...existing,
-                      direction,
-                    }))
-                  }
+                  onChange={(direction) => doArtistSort({ direction })}
                 />
               </Col>
             </Row>
@@ -91,24 +103,14 @@ export const PromptForm = () => {
                 <Select
                   options={SORT_OPTIONS}
                   value={tagSort.type}
-                  onChange={(type) =>
-                    setTagSort((existing) => ({
-                      ...existing,
-                      type,
-                    }))
-                  }
+                  onChange={(type) => doTagSort({ type })}
                 />
               </Col>
               <Col span={12}>
                 <Select
                   options={SORT_DIRECTION}
                   value={tagSort.direction}
-                  onChange={(direction) =>
-                    setTagSort((existing) => ({
-                      ...existing,
-                      direction,
-                    }))
-                  }
+                  onChange={(direction) => doTagSort({ direction })}
                 />
               </Col>
             </Row>

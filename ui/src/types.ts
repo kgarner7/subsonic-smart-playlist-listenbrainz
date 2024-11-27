@@ -71,3 +71,8 @@ export interface Session {
   name: string;
   seen: number;
 }
+
+export enum SortKey {
+  ARTIST = "artist",
+  GENRE = "genre"
+}

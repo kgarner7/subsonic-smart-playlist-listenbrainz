@@ -88,7 +88,7 @@ def create_app():
     @login_or_credentials_required
     def get_playlists(credentials):
         conn = CustomConnection(credentials=credentials)
-        playlists = conn.getPlaylists()["playlists"]["playlist"]
+        playlists = conn.getPlaylists()["playlists"].get("playlist", [])
         minified = [
             {
                 "id": playlist["id"],
@@ -98,19 +98,19 @@ def create_app():
             }
             for playlist in playlists
         ]
-        return minified, 200
+        return minified
 
     @app.get("/api/session")
     @login_or_credentials_required
     @get_database
     def sessions(credentials):
-        return get_sessions(credentials["u"]), 200
+        return get_sessions(credentials["u"])
 
     @app.get("/api/tags")
     @login_or_credentials_required
     @get_database
     def tags(_):
-        return get_metadata(), 200
+        return get_metadata()
 
     @app.post("/api/radio")
     @login_or_credentials_required
@@ -166,7 +166,7 @@ def create_app():
 
         resp = conn.createPlaylist(name=json.name, playlistId=json.id, songIds=json.ids)
 
-        return {"id": resp["playlist"]["id"]}, 200
+        return {"id": resp["playlist"]["id"]}
 
     @app.post("/api/session")
     @login_or_credentials_required
@@ -182,7 +182,7 @@ def create_app():
     def do_delete_session(credentials, id):
         try:
             delete_session(credentials["u"], id)
-            return {}, 200
+            return {}
         except BaseException as e:
             print(e)
             return {"error": "Could not"}, 400
@@ -191,7 +191,7 @@ def create_app():
     @login_or_credentials_required
     def logout(_):
         session.clear()
-        return {}, 200
+        return {}
 
     @app.after_request
     def add_headers(response):
