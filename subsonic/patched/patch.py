@@ -19,3 +19,4 @@ filters.HatedRecordingsFilterElement = HatedSubsonicRecordingsFilterElement
 playlist.PlaylistElement = PlaylistElement
 rl.RecordingLookupElement = BatchedLookupWithExclude
 lbr.LBRadioPatch = LBRadioNamedLookup
+lbr.WeighAndBlendRecordingsElement = WeightAndBlendAllowExcessArtistsToHitTarget

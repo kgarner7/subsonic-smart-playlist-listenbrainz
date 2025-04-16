@@ -1,3 +1,5 @@
+from time import sleep
+
 from requests import Session
 from uuid import UUID
 
