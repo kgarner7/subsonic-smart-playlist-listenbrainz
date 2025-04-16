@@ -122,7 +122,7 @@ if __name__ == "__main__":
 
     if prompt.type == PromptType.SESSION:
         try:
-            session: "Session" = (
+            session = (
                 Session.select(Session.mode, Session.prompt, Session.seen)
                 .where(
                     Session.username == json.credentials["u"],
